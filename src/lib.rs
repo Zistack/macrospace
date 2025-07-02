@@ -19,3 +19,4 @@ pub mod generics;
 pub mod path_utils;
 pub mod substitute;
 pub mod struct_utils;
+pub mod pattern;
