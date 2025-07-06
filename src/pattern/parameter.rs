@@ -1,19 +1,53 @@
+use proc_macro2::TokenStream;
 use syn::{Ident, Token};
 use syn::buffer::Cursor;
+use syn::parse::{Parse, ParseStream, Result};
 use syn_derive::{Parse, ToTokens};
+use quote::ToTokens;
 
 use super::cursor_parse::CursorParse;
 
-#[derive (Clone, Debug, Parse, ToTokens)]
-pub struct TypedParameter
+#[derive (Clone, Debug)]
+pub struct TypedParameter <T>
 {
-	dollar_token: Token! [$],
+	dollar_token: syn::token::Dollar,
 	ident: Ident,
-	colon_token: Token! [:],
-	ty_ident: Ident
+	colon_token: syn::token::Colon,
+	ty: T
 }
 
-impl CursorParse for TypedParameter
+impl <T> Parse for TypedParameter <T>
+where T: Parse
+{
+	fn parse (input: ParseStream <'_>) -> Result <Self>
+	{
+		Ok
+		(
+			Self
+			{
+				dollar_token: input . parse ()?,
+				ident: input . parse ()?,
+				colon_token: input . parse ()?,
+				ty: input . parse ()?
+			}
+		)
+	}
+}
+
+impl <T> ToTokens for TypedParameter <T>
+where T: ToTokens
+{
+	fn to_tokens (&self, tokens: &mut TokenStream)
+	{
+		self . dollar_token . to_tokens (tokens);
+		self . ident . to_tokens (tokens);
+		self . colon_token . to_tokens (tokens);
+		self . ty . to_tokens (tokens);
+	}
+}
+
+impl <T> CursorParse for TypedParameter <T>
+where T: CursorParse
 {
 	fn parse_from_cursor (cursor: Cursor <'_>) -> Option <(Self, Cursor <'_>)>
 	{
@@ -43,13 +77,13 @@ impl CursorParse for TypedParameter
 			_ => { return None; }
 		};
 
-		let (ty_ident, cursor) = match cursor . ident ()
+		let (ty, cursor) = match T::parse_from_cursor (cursor)
 		{
-			Some ((ident, cursor)) => (ident, cursor),
+			Some ((ty, cursor)) => (ty, cursor),
 			_ => { return None; }
 		};
 
-		Some ((Self {dollar_token, ident, colon_token, ty_ident}, cursor))
+		Some ((Self {dollar_token, ident, colon_token, ty}, cursor))
 	}
 }
 
