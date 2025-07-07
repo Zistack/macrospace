@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use syn::parse::ParseStream;
 
-pub trait PatternBindings <P>
+pub trait MatchBindings <P>
 {
 	type Error;
 
@@ -14,9 +14,12 @@ pub trait PatternBindings <P>
 	-> Result <(), Self::Error>;
 
 	fn try_merge (&mut self, other: Self) -> Result <(), Self::Error>;
+}
+
+pub trait SubstitutionBindings <P>
+{
+	type Error;
 
 	fn write_parameter_tokens (&self, parameter: P, tokens: &mut TokenStream)
 	-> Result <(), Self::Error>;
-
-	// I'm sure that we'll want some accessors as well.
 }

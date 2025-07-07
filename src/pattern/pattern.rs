@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use syn::buffer::{Cursor, TokenBuffer};
 use syn::parse::{ParseStream, Parser};
 
-use super::{PunctGroup, PatternBindings, PatternVisitor};
+use super::{PunctGroup, MatchBindings, SubstitutionBindings, PatternVisitor};
 use super::cursor_parse::CursorParse;
 use super::match_visitor::MatchVisitor;
 use super::substitution_visitor::SubstitutionVisitor;
@@ -113,7 +113,7 @@ where P: CursorParse
 
 	pub fn match_input <B> (&self, input: ParseStream <'_>)
 	-> syn::parse::Result <B>
-	where B: Default + PatternBindings <P, Error = syn::parse::Error>
+	where B: Default + MatchBindings <P, Error = syn::parse::Error>
 	{
 		let mut match_visitor = MatchVisitor::new (input);
 
@@ -124,14 +124,14 @@ where P: CursorParse
 
 	pub fn match_tokens <B> (&self, tokens: TokenStream)
 	-> syn::parse::Result <B>
-	where B: Default + PatternBindings <P, Error = syn::parse::Error>
+	where B: Default + MatchBindings <P, Error = syn::parse::Error>
 	{
 		(|input: ParseStream <'_>| { self . match_input (input) })
 			. parse2 (tokens)
 	}
 
 	pub fn substitute <B> (&self, bindings: B) -> Result <TokenStream, B::Error>
-	where B: PatternBindings <P>
+	where B: SubstitutionBindings <P>
 	{
 		let mut substitution_visitor = SubstitutionVisitor::new (&bindings);
 

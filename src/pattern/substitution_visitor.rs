@@ -3,7 +3,7 @@ use proc_macro2::extra::DelimSpan;
 use syn::Ident;
 use quote::{ToTokens, TokenStreamExt};
 
-use super::{PunctGroup, PatternVisitor, PatternBindings};
+use super::{PunctGroup, PatternVisitor, SubstitutionBindings};
 
 pub struct SubstitutionVisitor <'a, B>
 {
@@ -25,7 +25,7 @@ impl <'a, B> SubstitutionVisitor <'a, B>
 }
 
 impl <'a, B, P> PatternVisitor <P> for SubstitutionVisitor <'a, B>
-where B: PatternBindings <P>
+where B: SubstitutionBindings <P>
 {
 	type Error = B::Error;
 	type SubVisitor = SubstitutionVisitor <'a, B>;

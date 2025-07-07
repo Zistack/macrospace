@@ -6,7 +6,7 @@ use proc_macro2::extra::DelimSpan;
 use syn::{Ident, parenthesized, braced, bracketed};
 use syn::parse::{ParseBuffer, Error};
 
-use super::{PunctGroup, PatternVisitor, PatternBindings};
+use super::{PunctGroup, PatternVisitor, MatchBindings};
 
 pub struct MatchVisitor <'a, S, B>
 {
@@ -37,7 +37,7 @@ impl <'a, S, B> MatchVisitor <'a, S, B>
 impl <'a, S, B, P> PatternVisitor <P> for MatchVisitor <'a, S, B>
 where
 	S: Borrow <ParseBuffer <'a>>,
-	B: Default + PatternBindings <P, Error = Error>
+	B: Default + MatchBindings <P, Error = Error>
 {
 	type Error = Error;
 	type SubVisitor = MatchVisitor <'a, ParseBuffer <'a>, B>;
