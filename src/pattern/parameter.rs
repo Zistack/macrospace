@@ -10,10 +10,10 @@ use super::cursor_parse::CursorParse;
 #[derive (Clone, Debug)]
 pub struct TypedParameter <T>
 {
-	dollar_token: syn::token::Dollar,
-	ident: Ident,
-	colon_token: syn::token::Colon,
-	ty: T
+	pub dollar_token: syn::token::Dollar,
+	pub ident: Ident,
+	pub colon_token: syn::token::Colon,
+	pub ty: T
 }
 
 impl <T> Parse for TypedParameter <T>
@@ -90,8 +90,8 @@ where T: CursorParse
 #[derive (Clone, Debug, Parse, ToTokens)]
 pub struct UntypedParameter
 {
-	dollar_token: Token! [$],
-	ident: Ident
+	pub dollar_token: Token! [$],
+	pub ident: Ident
 }
 
 impl CursorParse for UntypedParameter
