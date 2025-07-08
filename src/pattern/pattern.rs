@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 
 use proc_macro2::TokenStream;
@@ -22,6 +23,21 @@ pub struct Pattern <P>
 	_parameter_type: PhantomData <P>
 }
 
+impl <P> Clone for Pattern <P>
+{
+	fn clone (&self) -> Self
+	{
+		Self
+		{
+			pattern_tokens: TokenBuffer::new2
+			(
+				self . pattern_tokens . begin () . token_stream ()
+			),
+			_parameter_type: PhantomData::default ()
+		}
+	}
+}
+
 impl <P> From <TokenStream> for Pattern <P>
 {
 	fn from (tokens: TokenStream) -> Self
@@ -31,6 +47,29 @@ impl <P> From <TokenStream> for Pattern <P>
 			pattern_tokens: TokenBuffer::new2 (tokens),
 			_parameter_type: PhantomData::default ()
 		}
+	}
+}
+
+impl <P> Debug for Pattern <P>
+{
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	{
+		f . debug_struct ("Pattern")
+			. field
+			(
+				"pattern_tokens",
+				&self . pattern_tokens . begin () . token_stream ()
+			)
+			. field ("_parameter_type", &self . _parameter_type)
+			. finish ()
+	}
+}
+
+impl <P> Display for Pattern <P>
+{
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	{
+		Display::fmt (&self . pattern_tokens . begin () . token_stream (), f)
 	}
 }
 
