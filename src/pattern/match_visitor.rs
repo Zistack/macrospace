@@ -4,9 +4,9 @@ use std::marker::PhantomData;
 use proc_macro2::{Literal, Delimiter};
 use proc_macro2::extra::DelimSpan;
 use syn::{Ident, parenthesized, braced, bracketed};
-use syn::parse::{ParseBuffer, Error};
+use syn::parse::{ParseBuffer};
 
-use super::{PunctGroup, PatternVisitor, MatchBindings};
+use super::{PunctGroup, PatternVisitor, MatchBindings, MergeableBindings};
 
 pub struct MatchVisitor <'a, S, B>
 {
@@ -37,14 +37,17 @@ impl <'a, S, B> MatchVisitor <'a, S, B>
 impl <'a, S, B, P> PatternVisitor <P> for MatchVisitor <'a, S, B>
 where
 	S: Borrow <ParseBuffer <'a>>,
-	B: Default + MatchBindings <P, Error = Error>
+	B: Default + MatchBindings <P> + MergeableBindings,
+	B::Error: Into <syn::parse::Error>
 {
-	type Error = Error;
+	type Error = syn::parse::Error;
 	type SubVisitor = MatchVisitor <'a, ParseBuffer <'a>, B>;
 
 	fn visit_parameter (&mut self, parameter: P) -> Result <(), Self::Error>
 	{
-		self . bindings . parse_parameter_binding (parameter, self . input . borrow ())
+		self
+			. bindings
+			. parse_parameter_binding (parameter, self . input . borrow ())
 	}
 
 	fn visit_ident (&mut self, ident: Ident) -> Result <(), Self::Error>
@@ -55,7 +58,11 @@ where
 		{
 			return Err
 			(
-				Error::new_spanned (input_ident, format! ("expected {}", ident))
+				syn::parse::Error::new_spanned
+				(
+					input_ident,
+					format! ("expected {}", ident)
+				)
 			);
 		}
 
@@ -70,7 +77,7 @@ where
 		{
 			return Err
 			(
-				Error::new_spanned
+				syn::parse::Error::new_spanned
 				(
 					input_literal,
 					format! ("expected {}", literal)
@@ -102,22 +109,23 @@ where
 			Delimiter::Parenthesis =>
 			{
 				parenthesized! (content in self . input . borrow ());
-			},
+			}
 			Delimiter::Brace =>
 			{
 				braced! (content in self . input . borrow ());
-			},
+			}
 			Delimiter::Bracket =>
 			{
 				bracketed! (content in self . input . borrow ());
-			},
+			}
 			Delimiter::None => return Err
 			(
-				Error::new
+				syn::parse::Error::new
 				(
 					group_span . join (),
 					"undelimited groups are not supported"
 				)
+					. into ()
 			)
 		}
 
@@ -133,7 +141,10 @@ where
 	)
 	-> Result <(), Self::Error>
 	{
-		self . bindings . try_merge (sub_visitor . bindings)
+		self
+			. bindings
+			. try_merge (sub_visitor . bindings)
+			. map_err (Into::into)
 	}
 
 	fn visit_end (&mut self) -> Result <(), Self::Error>
@@ -142,7 +153,10 @@ where
 		{
 			return Err
 			(
-				self . input . borrow () . error ("expected end of input")
+				self
+					. input
+					. borrow ()
+					. error ("expected end of input")
 			);
 		}
 

@@ -1,7 +1,9 @@
+use std::fmt::{Display, Formatter};
+
 use proc_macro2::TokenStream;
 use syn::{Ident, Token};
 use syn::buffer::Cursor;
-use syn::parse::{Parse, ParseStream, Result};
+use syn::parse::{Parse, ParseStream};
 use syn_derive::{Parse, ToTokens};
 use quote::ToTokens;
 
@@ -19,7 +21,7 @@ pub struct TypedParameter <T>
 impl <T> Parse for TypedParameter <T>
 where T: Parse
 {
-	fn parse (input: ParseStream <'_>) -> Result <Self>
+	fn parse (input: ParseStream <'_>) -> syn::parse::Result <Self>
 	{
 		Ok
 		(
@@ -87,6 +89,15 @@ where T: CursorParse
 	}
 }
 
+impl <T> Display for TypedParameter <T>
+where T: Display
+{
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	{
+		f . write_fmt (format_args! ("`${}: {}`", self . ident, self . ty))
+	}
+}
+
 #[derive (Clone, Debug, Parse, ToTokens)]
 pub struct UntypedParameter
 {
@@ -115,5 +126,13 @@ impl CursorParse for UntypedParameter
 		};
 
 		Some ((Self {dollar_token, ident}, cursor))
+	}
+}
+
+impl Display for UntypedParameter
+{
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	{
+		f . write_fmt (format_args! ("`${}`", self . ident))
 	}
 }
