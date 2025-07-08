@@ -34,7 +34,7 @@ pub struct ParameterBindingMismatch <T>
 
 impl <T> ParameterBindingMismatch <T>
 {
-	fn new (ident: Ident, first_value: T, second_value: T) -> Self
+	pub fn new (ident: Ident, first_value: T, second_value: T) -> Self
 	{
 		Self {ident, first_value, second_value}
 	}
@@ -97,7 +97,7 @@ pub struct ParameterNotFound <P>
 
 impl <P> ParameterNotFound <P>
 {
-	fn new (parameter: P) -> Self
+	pub fn new (parameter: P) -> Self
 	{
 		Self {parameter}
 	}
