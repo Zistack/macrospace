@@ -2,7 +2,8 @@ use std::marker::PhantomData;
 
 use proc_macro2::TokenStream;
 use syn::buffer::{Cursor, TokenBuffer};
-use syn::parse::{ParseStream, Parser};
+use syn::parse::{Parse, ParseStream, Parser};
+use quote::{ToTokens, TokenStreamExt};
 
 use super::{
 	PunctGroup,
@@ -29,6 +30,27 @@ impl <P> From <TokenStream> for Pattern <P>
 		{
 			pattern_tokens: TokenBuffer::new2 (tokens),
 			_parameter_type: PhantomData::default ()
+		}
+	}
+}
+
+impl <P> Parse for Pattern <P>
+{
+	fn parse (input: ParseStream <'_>) -> syn::parse::Result <Self>
+	{
+		Ok (<Self as From <TokenStream>>::from (input . parse ()?))
+	}
+}
+
+impl <P> ToTokens for Pattern <P>
+{
+	fn to_tokens (&self, tokens: &mut TokenStream)
+	{
+		let mut cursor = self . pattern_tokens . begin ();
+		while let Some ((token_tree, next_cursor)) = cursor . token_tree ()
+		{
+			tokens . append (token_tree);
+			cursor = next_cursor;
 		}
 	}
 }
