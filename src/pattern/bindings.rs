@@ -6,6 +6,8 @@ use syn::Ident;
 use syn::parse::ParseStream;
 use quote::ToTokens;
 
+use super::TypedParameter;
+
 pub trait MatchBindings <P>
 {
 	fn parse_parameter_binding
@@ -103,7 +105,7 @@ impl <P> ParameterNotFound <P>
 	}
 }
 
-impl <P> Display for ParameterNotFound<P>
+impl <P> Display for ParameterNotFound <P>
 where P: Display
 {
 	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
@@ -134,5 +136,106 @@ where P: ToTokens
 			self . parameter,
 			"no binding found for parameter"
 		)
+	}
+}
+
+#[derive (Clone, Debug)]
+pub struct ParameterTypeMismatch <T>
+{
+	value_type: T,
+	parameter: TypedParameter <T>
+}
+
+impl <T> ParameterTypeMismatch <T>
+{
+	pub fn new (value_type: T, parameter: TypedParameter <T>) -> Self
+	{
+		Self {value_type, parameter}
+	}
+}
+
+impl <T> Display for ParameterTypeMismatch <T>
+where T: Display
+{
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	{
+		f . write_fmt
+		(
+			format_args!
+			(
+				"parameter `{}` has value of type `{}`, but value of type `{}` was requested by the pattern",
+				&self . parameter . ident,
+				&self . value_type,
+				&self . parameter . ty
+			)
+		)
+	}
+}
+
+impl <T> Error for ParameterTypeMismatch <T>
+where T: Debug + Display,
+{
+}
+
+impl <T> Into <syn::parse::Error> for ParameterTypeMismatch <T>
+where T: Display + ToTokens
+{
+	fn into (self) -> syn::parse::Error
+	{
+		syn::parse::Error::new_spanned (&self . parameter, self . to_string ())
+	}
+}
+
+#[derive (Clone, Debug)]
+pub enum SubstitutionError <T>
+{
+	NotFound (ParameterNotFound <TypedParameter <T>>),
+	TypeMismatch (ParameterTypeMismatch <T>)
+}
+
+impl <T> From <ParameterNotFound <TypedParameter <T>>> for SubstitutionError <T>
+{
+	fn from (e: ParameterNotFound <TypedParameter <T>>) -> Self
+	{
+		Self::NotFound (e)
+	}
+}
+
+impl <T> From <ParameterTypeMismatch <T>> for SubstitutionError <T>
+{
+	fn from (e: ParameterTypeMismatch <T>) -> Self
+	{
+		Self::TypeMismatch (e)
+	}
+}
+
+impl <T> Display for SubstitutionError <T>
+where T: Display
+{
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	{
+		match self
+		{
+			Self::NotFound (e) => Display::fmt (e, f),
+			Self::TypeMismatch (e) => Display::fmt (e, f)
+		}
+	}
+}
+
+impl <T> Error for SubstitutionError <T>
+where T: Debug + Display
+{
+}
+
+impl <T> Into <syn::parse::Error> for SubstitutionError <T>
+where T: Display + ToTokens
+{
+	fn into (self) -> syn::parse::Error
+	{
+		match self
+		{
+			Self::NotFound (e) => e . into (),
+			Self::TypeMismatch (e) => e . into ()
+		}
 	}
 }
