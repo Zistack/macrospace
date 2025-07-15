@@ -192,6 +192,30 @@ impl Substitutions
 		}
 	}
 
+	pub fn scrubber
+	(
+		prefix: &str,
+		generic_parameters: &Punctuated <GenericParam, Token! [,]>
+	)
+	-> Self
+	{
+		let mut parameters = HashMap::new ();
+
+		for generic_param in generic_parameters
+		{
+			let parameter = Parameter::from (generic_param . clone ());
+			let argument = Argument::hygenic_from_parameter
+			(
+				prefix,
+				generic_param . clone ()
+			);
+
+			parameters . insert (parameter, argument);
+		}
+
+		Self {parameters}
+	}
+
 	pub fn try_merge (mut self, other: Self)
 	-> std::result::Result <Self, ArgumentMismatchError>
 	{

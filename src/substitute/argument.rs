@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use syn::{Lifetime, Type, Expr, GenericArgument, GenericParam, parse_quote};
 use syn::parse::{Result, Error};
 use syn_derive::{Parse, ToTokens};
-use quote::ToTokens;
+use quote::{ToTokens, format_ident};
 
 use super::parameter::Parameter;
 
@@ -64,6 +64,54 @@ impl Argument
 						"Const parameter lacks a default_argument"
 					)
 				)
+			}
+		}
+	}
+
+	pub fn hygenic_from_parameter
+	(
+		ident_prefix: &str,
+		generic_param: GenericParam
+	)
+	-> Self
+	{
+		match generic_param
+		{
+			GenericParam::Lifetime (lifetime_param) =>
+			{
+				let ident = format_ident!
+				(
+					"{}{}",
+					ident_prefix,
+					lifetime_param . lifetime . ident,
+					span = proc_macro2::Span::mixed_site ()
+				);
+				Argument::Lifetime
+				(
+					Lifetime {apostrophe: ident . span (), ident}
+				)
+			},
+			GenericParam::Type (type_param) =>
+			{
+				let ident = format_ident!
+				(
+					"{}{}",
+					ident_prefix,
+					type_param . ident,
+					span = proc_macro2::Span::mixed_site ()
+				);
+				Argument::Type (parse_quote! (#ident))
+			},
+			GenericParam::Const (const_param) =>
+			{
+				let ident = format_ident!
+				(
+					"{}{}",
+					ident_prefix,
+					const_param . ident,
+					span = proc_macro2::Span::mixed_site ()
+				);
+				Argument::Const (parse_quote! (#ident))
 			}
 		}
 	}
