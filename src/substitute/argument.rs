@@ -1,10 +1,13 @@
+use std::fmt::{Display, Formatter};
+
 use syn::{Lifetime, Type, Expr, GenericArgument, GenericParam, parse_quote};
 use syn::parse::{Result, Error};
 use syn_derive::{Parse, ToTokens};
+use quote::ToTokens;
 
 use super::parameter::Parameter;
 
-#[derive (Clone, PartialEq, Eq, Hash, Parse, ToTokens)]
+#[derive (Clone, Debug, PartialEq, Eq, Hash, Parse, ToTokens)]
 pub enum Argument
 {
 	#[parse (peek = Lifetime)]
@@ -30,7 +33,8 @@ impl Argument
 					"Lifetime parameters cannot have default values"
 				)
 			),
-			GenericParam::Type (type_param) => if let Some (ty) = type_param . default
+			GenericParam::Type (type_param) =>
+				if let Some (ty) = type_param . default
 			{
 				Ok (Argument::Type (ty))
 			}
@@ -45,7 +49,8 @@ impl Argument
 					)
 				)
 			},
-			GenericParam::Const (const_param) => if let Some (expr) = const_param . default
+			GenericParam::Const (const_param) =>
+				if let Some (expr) = const_param . default
 			{
 				Ok (Argument::Const (expr))
 			}
@@ -168,6 +173,20 @@ impl <'a> From <&'a Parameter> for Argument
 				Argument::Type (parse_quote! (#ident)),
 			Parameter::Const (_, ident) =>
 				Argument::Const (parse_quote! (#ident))
+		}
+	}
+}
+
+impl Display for Argument
+{
+	fn fmt (&self, f: &mut Formatter <'_>)
+	-> std::result::Result <(), std::fmt::Error>
+	{
+		match self
+		{
+			Self::Lifetime (lifetime) => Display::fmt (lifetime, f),
+			Self::Type (ty) => Display::fmt (&ty . to_token_stream (), f),
+			Self::Const (expr) => Display::fmt (&expr . to_token_stream (), f)
 		}
 	}
 }

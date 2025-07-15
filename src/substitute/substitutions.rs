@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::iter::repeat;
 
 use syn
@@ -31,6 +32,36 @@ use crate::generics::get_num_required_arguments;
 use super::parameter::Parameter;
 use super::argument::Argument;
 
+#[derive (Clone, Debug)]
+pub struct ArgumentMismatchError
+{
+	parameter: Parameter,
+	self_argument: Argument,
+	other_argument: Argument
+}
+
+impl Display for ArgumentMismatchError
+{
+	fn fmt (&self, f: &mut Formatter <'_>)
+	-> std::result::Result <(), std::fmt::Error>
+	{
+		f . write_fmt
+		(
+			format_args!
+			(
+				"arguments for parameter {} do not match: {} != {}",
+				self . parameter,
+				self . self_argument,
+				self . other_argument
+			)
+		)
+	}
+}
+
+impl std::error::Error for ArgumentMismatchError
+{
+}
+
 #[derive (Clone, PartialEq, Eq)]
 pub struct Substitutions
 {
@@ -39,7 +70,12 @@ pub struct Substitutions
 
 impl Substitutions
 {
-	pub fn new
+	pub fn new () -> Self
+	{
+		Self {parameters: HashMap::new ()}
+	}
+
+	pub fn try_from_generics
 	(
 		item_parameters: &Punctuated <GenericParam, Token! [,]>,
 		path_arguments: &Punctuated <GenericArgument, Token! [,]>
@@ -156,6 +192,39 @@ impl Substitutions
 		}
 	}
 
+	pub fn try_merge (mut self, other: Self)
+	-> std::result::Result <Self, ArgumentMismatchError>
+	{
+		for (other_parameter, other_argument) in other . parameters
+		{
+			let self_argument = self . parameters . get (&other_parameter);
+
+			match self_argument
+			{
+				Some (argument) => if *argument != other_argument
+				{
+					return Err
+					(
+						ArgumentMismatchError
+						{
+							parameter: other_parameter,
+							self_argument: argument . clone (),
+							other_argument
+						}
+					);
+				},
+				None =>
+				{
+					self
+						. parameters
+						. insert (other_parameter, other_argument);
+				}
+			}
+		}
+
+		Ok (self)
+	}
+
 	pub fn fold_parameter_value (&mut self, node: Argument) -> Argument
 	{
 		match node
@@ -186,7 +255,16 @@ impl Default for Substitutions
 {
 	fn default () -> Self
 	{
-		Self {parameters: HashMap::new ()}
+		Self::new ()
+	}
+}
+
+impl FromIterator <(Parameter, Argument)> for Substitutions
+{
+	fn from_iter <I> (iter: I) -> Self
+	where I: IntoIterator <Item = (Parameter, Argument)>
+	{
+		Self {parameters: HashMap::from_iter (iter)}
 	}
 }
 

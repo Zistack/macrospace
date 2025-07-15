@@ -1,9 +1,11 @@
+use std::fmt::{Display, Formatter};
+
 use syn::{Ident, Lifetime, GenericArgument, GenericParam, Token, parse2};
 use syn::parse::{Result, Error};
 use syn_derive::{Parse, ToTokens};
 use quote::ToTokens;
 
-#[derive (Clone, PartialEq, Eq, Hash, Parse, ToTokens)]
+#[derive (Clone, Debug, PartialEq, Eq, Hash, Parse, ToTokens)]
 pub enum Parameter
 {
 	#[parse (peek = Lifetime)]
@@ -33,7 +35,8 @@ impl From <GenericParam> for Parameter
 }
 
 impl TryFrom <GenericArgument> for Parameter
-{	type Error = Error;
+{
+	type Error = Error;
 
 	fn try_from (generic_argument: GenericArgument) -> Result <Self>
 	{
@@ -58,9 +61,26 @@ impl TryFrom <GenericArgument> for Parameter
 				Error::new_spanned
 				(
 					generic_argument,
-					"Constraints make no sense in this context"
+					"constraints make no sense in this context"
 				)
 			)
+		}
+	}
+}
+
+impl Display for Parameter
+{
+	fn fmt (&self, f: &mut Formatter <'_>)
+	-> std::result::Result <(), std::fmt::Error>
+	{
+		match self
+		{
+			Self::Lifetime (lifetime) => Display::fmt (lifetime, f),
+			Self::Type (ty_ident) => Display::fmt (ty_ident, f),
+			Self::Const (_const_token, const_ident) =>
+			{
+				f . write_fmt (format_args! ("const {}", const_ident))
+			}
 		}
 	}
 }

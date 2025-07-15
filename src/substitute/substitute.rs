@@ -72,7 +72,7 @@ pub fn substitute_arguments_for_struct
 )
 -> Result <(Substitutions, ItemStruct)>
 {
-	let mut substitutions = Substitutions::new
+	let mut substitutions = Substitutions::try_from_generics
 	(
 		&struct_item . generics . params,
 		&get_path_arguments (struct_path)?
@@ -93,7 +93,7 @@ pub fn substitute_arguments_for_enum
 )
 -> Result <(Substitutions, ItemEnum)>
 {
-	let mut substitutions = Substitutions::new
+	let mut substitutions = Substitutions::try_from_generics
 	(
 		&enum_item . generics . params,
 		&get_path_arguments (enum_path)?
@@ -114,7 +114,7 @@ pub fn substitute_arguments_for_trait
 )
 -> Result <(Substitutions, ItemTrait)>
 {
-	let mut substitutions = Substitutions::new
+	let mut substitutions = Substitutions::try_from_generics
 	(
 		&trait_item . generics . params,
 		&get_path_arguments (trait_path)?
@@ -131,7 +131,7 @@ pub fn substitute_arguments_for_trait
 pub fn substitute_arguments_for_fn (mut fn_item: ItemFn, fn_path: &Path)
 -> Result <(Substitutions, ItemFn)>
 {
-	let mut substitutions = Substitutions::new
+	let mut substitutions = Substitutions::try_from_generics
 	(
 		&fn_item . sig . generics . params,
 		&get_path_arguments (fn_path)?
@@ -152,7 +152,7 @@ pub fn substitute_arguments_for_derive_input
 )
 -> Result <(Substitutions, DeriveInput)>
 {
-	let mut substitutions = Substitutions::new
+	let mut substitutions = Substitutions::try_from_generics
 	(
 		&derive_input . generics . params,
 		&get_path_arguments (derive_input_path)?
