@@ -10,11 +10,13 @@ use super::{
 	PunctGroup,
 	MatchBindings,
 	MergeableBindings,
+	ParameterCollector,
 	SubstitutionBindings,
 	PatternVisitor
 };
 use super::cursor_parse::CursorParse;
 use super::match_visitor::MatchVisitor;
+use super::collect_visitor::CollectVisitor;
 use super::substitution_visitor::SubstitutionVisitor;
 
 pub struct Pattern <P>
@@ -197,8 +199,23 @@ where P: CursorParse
 		B: Default + MatchBindings <P> + MergeableBindings,
 		B::Error: Into <syn::parse::Error>
 	{
-		(|input: ParseStream <'_>| { self . match_input (input) . map_err (Into::into) })
-			. parse2 (tokens)
+		let parser = |input: ParseStream <'_>|
+		{
+			self . match_input (input) . map_err (Into::into)
+		};
+
+		parser . parse2 (tokens)
+	}
+
+	pub fn collect_parameters <C> (&self)
+	-> Result <C, <C as MergeableBindings>::Error>
+	where C: Default + ParameterCollector <P> + MergeableBindings
+	{
+		let mut collect_visitor = CollectVisitor::new ();
+
+		self . visit_pattern (&mut collect_visitor)?;
+
+		Ok (collect_visitor . into_collector ())
 	}
 
 	pub fn substitute <B> (&self, bindings: B) -> Result <TokenStream, B::Error>

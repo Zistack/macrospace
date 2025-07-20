@@ -1,4 +1,5 @@
 mod match_visitor;
+mod collect_visitor;
 mod substitution_visitor;
 
 mod cursor_parse;
@@ -13,8 +14,8 @@ pub use punct_group::*;
 mod bindings;
 pub use bindings::*;
 
-mod visitor;
-pub use visitor::*;
+mod pattern_visitor;
+pub use pattern_visitor::*;
 
 mod pattern;
 pub use pattern::*;

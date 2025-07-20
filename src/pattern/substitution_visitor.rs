@@ -83,9 +83,4 @@ where B: SubstitutionBindings <P>
 
 		Ok (())
 	}
-
-	fn visit_end (&mut self) -> Result <(), Self::Error>
-	{
-		Ok (())
-	}
 }

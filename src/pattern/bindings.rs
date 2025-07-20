@@ -83,6 +83,11 @@ where T: ToTokens
 	}
 }
 
+pub trait ParameterCollector <P>
+{
+	fn add_parameter (&mut self, parameter: P);
+}
+
 pub trait SubstitutionBindings <P>
 {
 	type Error;
