@@ -75,7 +75,7 @@ impl Substitutions
 		Self {parameters: HashMap::new ()}
 	}
 
-	pub fn try_from_generics
+	pub fn try_from_path_arguments
 	(
 		item_parameters: &Punctuated <GenericParam, Token! [,]>,
 		path_arguments: &Punctuated <GenericArgument, Token! [,]>
@@ -190,6 +190,24 @@ impl Substitutions
 
 			substitutions = new_substitutions;
 		}
+	}
+
+	pub fn from_generic_parmeters
+	(
+		orig_parameters: &Punctuated <GenericParam, Token! [,]>,
+		new_parameters: &Punctuated <GenericParam, Token! [,]>
+	)
+	-> Self
+	{
+		let parameters = orig_parameters
+			. iter ()
+			. map (|param| param . into ());
+
+		let arguments = new_parameters
+			. iter ()
+			. map (|param| param . into ());
+
+		Self::from_iter (parameters . zip (arguments))
 	}
 
 	pub fn scrubber

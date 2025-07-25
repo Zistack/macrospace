@@ -34,6 +34,25 @@ impl From <GenericParam> for Parameter
 	}
 }
 
+impl <'a> From <&'a GenericParam> for Parameter
+{
+	fn from (generic_param: &'a GenericParam) -> Self
+	{
+		match generic_param
+		{
+			GenericParam::Lifetime (lifetime_param) =>
+				Parameter::Lifetime (lifetime_param . lifetime . clone ()),
+			GenericParam::Type (type_param) =>
+				Parameter::Type (type_param . ident . clone ()),
+			GenericParam::Const (const_param) => Parameter::Const
+			(
+				const_param . const_token,
+				const_param . ident . clone ()
+			)
+		}
+	}
+}
+
 impl TryFrom <GenericArgument> for Parameter
 {
 	type Error = Error;
