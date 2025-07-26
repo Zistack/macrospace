@@ -192,7 +192,7 @@ impl Substitutions
 		}
 	}
 
-	pub fn from_generic_parmeters
+	pub fn from_generic_parameters
 	(
 		orig_parameters: &Punctuated <GenericParam, Token! [,]>,
 		new_parameters: &Punctuated <GenericParam, Token! [,]>
