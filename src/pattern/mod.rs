@@ -22,3 +22,6 @@ pub use pattern_visitor::*;
 
 mod pattern;
 pub use pattern::*;
+
+mod expect;
+pub use expect::*;
