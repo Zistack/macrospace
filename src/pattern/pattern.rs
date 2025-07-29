@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 
 use proc_macro2::TokenStream;
+use syn::parse2;
 use syn::buffer::{Cursor, TokenBuffer};
 use syn::parse::{Parse, ParseStream, Parser};
 use quote::{ToTokens, TokenStreamExt};
@@ -12,12 +13,15 @@ use super::{
 	MergeableBindings,
 	ParameterCollector,
 	SubstitutionBindings,
-	PatternVisitor
+	PatternVisitor,
+	DummyTokens
 };
 use super::cursor_parse::CursorParse;
 use super::match_visitor::MatchVisitor;
 use super::collect_visitor::CollectVisitor;
 use super::substitution_visitor::SubstitutionVisitor;
+use super::dummy_substitution_visitor::*;
+use super::reconstruct::reconstruct_pattern_tokens;
 
 pub struct Pattern <P>
 {
@@ -178,6 +182,65 @@ where P: CursorParse
 		let cursor = self . pattern_tokens . begin ();
 
 		Self::visit_pattern_cursor (cursor, visitor)
+	}
+
+	pub fn validate_as <T> (&mut self) -> syn::parse::Result <()>
+	where
+		P: CursorParse + DummyTokens + ToTokens,
+		T: Parse + ToTokens
+	{
+		let mut dummy_substitution_visitor = DummySubstitutionVisitor::new ();
+
+		let _ = self . visit_pattern (&mut dummy_substitution_visitor);
+
+		let parsed_tokens = parse2::<T>
+		(
+			dummy_substitution_visitor . into_tokens ()
+		)?
+			. into_token_stream ();
+
+		self . pattern_tokens = TokenBuffer::new2
+		(
+			reconstruct_pattern_tokens::<P>
+			(
+				parsed_tokens,
+				&self . pattern_tokens
+			)?
+		);
+
+		Ok (())
+	}
+
+	pub fn validate_as_and_collect <T, C> (&mut self) -> syn::parse::Result <C>
+	where
+		P: CursorParse + DummyTokens + ToTokens,
+		T: Parse + ToTokens,
+		C: Default + ParameterCollector <P> + MergeableBindings,
+		C::Error: Into <syn::parse::Error>
+	{
+		let mut dummy_substitution_visitor =
+			DummySubstitutionCollectorVisitor::new ();
+
+		self
+			. visit_pattern (&mut dummy_substitution_visitor)
+			. map_err (|e: C::Error| e . into ())?;
+
+		let (collector, substituted_tokens) =
+			dummy_substitution_visitor . into_collector_and_tokens ();
+
+		let parsed_tokens =
+			parse2::<T> (substituted_tokens)? . into_token_stream ();
+
+		self . pattern_tokens = TokenBuffer::new2
+		(
+			reconstruct_pattern_tokens::<P>
+			(
+				parsed_tokens,
+				&self . pattern_tokens
+			)?
+		);
+
+		Ok (collector)
 	}
 
 	pub fn match_input <B> (&self, input: ParseStream <'_>)

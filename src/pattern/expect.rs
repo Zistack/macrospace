@@ -1,15 +1,14 @@
 use proc_macro2::{TokenStream, TokenTree, Delimiter};
+use syn::buffer::Cursor;
 use syn::parse::{Parser, ParseStream, Result, Error};
 
-pub fn expect_token_tree
+fn assert_token_tree
 (
-	input: ParseStream <'_>,
+	input_token_tree: TokenTree,
 	expected_token_tree: TokenTree
 )
 -> Result <()>
 {
-	let input_token_tree = input . parse ()?;
-
 	match (input_token_tree, expected_token_tree)
 	{
 		(TokenTree::Group (input_group), TokenTree::Group (expected_group)) =>
@@ -121,6 +120,18 @@ pub fn expect_token_tree
 	Ok (())
 }
 
+pub fn expect_token_tree
+(
+	input: ParseStream <'_>,
+	expected_token_tree: TokenTree
+)
+-> Result <()>
+{
+	let input_token_tree = input . parse ()?;
+
+	assert_token_tree (input_token_tree, expected_token_tree)
+}
+
 pub fn expect_tokens (input: ParseStream <'_>, expected_tokens: TokenStream)
 -> Result <()>
 {
@@ -130,4 +141,50 @@ pub fn expect_tokens (input: ParseStream <'_>, expected_tokens: TokenStream)
 	}
 
 	Ok (())
+}
+
+pub fn expect_token_tree_from_cursor
+(
+	input_cursor: Cursor <'_>,
+	expected_token_tree: TokenTree
+)
+-> Result <Cursor <'_>>
+{
+	if let Some ((input_token_tree, next_input_cursor)) =
+		input_cursor . token_tree ()
+	{
+		assert_token_tree (input_token_tree, expected_token_tree)?;
+
+		Ok (next_input_cursor)
+	}
+	else
+	{
+		Err
+		(
+			Error::new
+			(
+				input_cursor . span (),
+				format! ("expected `{}`", expected_token_tree)
+			)
+		)
+	}
+}
+
+pub fn expect_tokens_from_cursor
+(
+	mut input_cursor: Cursor <'_>,
+	expected_tokens: TokenStream
+)
+-> Result <Cursor <'_>>
+{
+	for expected_token_tree in expected_tokens
+	{
+		input_cursor = expect_token_tree_from_cursor
+		(
+			input_cursor,
+			expected_token_tree
+		)?;
+	}
+
+	Ok (input_cursor)
 }
