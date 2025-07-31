@@ -10,14 +10,16 @@ use super::{
 	expect_tokens_from_cursor
 };
 
-fn reconstruct_step <'a, 'b, P>
+fn reconstruct_step <'a, 'b, P, D>
 (
 	parsed_input_cursor: Cursor <'a>,
 	orig_pattern_cursor: Cursor <'b>,
 	output_tokens: &mut TokenStream
 )
 -> Result <(Cursor <'a>, Cursor <'b>)>
-where P: CursorParse + DummyTokens + ToTokens
+where
+	P: CursorParse + ToTokens,
+	D: DummyTokens <P>
 {
 	if let Some ((parameter, next_pattern_cursor)) =
 		P::parse_from_cursor (orig_pattern_cursor)
@@ -25,7 +27,7 @@ where P: CursorParse + DummyTokens + ToTokens
 		let next_parsed_cursor = expect_tokens_from_cursor
 		(
 			parsed_input_cursor,
-			parameter . dummy_tokens ()
+			D::dummy_tokens (&parameter)
 		)?;
 
 		parameter . to_tokens (output_tokens);
@@ -113,7 +115,7 @@ where P: CursorParse + DummyTokens + ToTokens
 		{
 			if parsed_delimiter == orig_delimiter
 			{
-				let output_group_tokens = reconstruct_stream::<P>
+				let output_group_tokens = reconstruct_stream::<P, D>
 				(
 					parsed_group_cursor,
 					orig_group_cursor
@@ -149,13 +151,15 @@ where P: CursorParse + DummyTokens + ToTokens
 	unreachable! ();
 }
 
-fn reconstruct_stream <'a, 'b, P>
+fn reconstruct_stream <'a, 'b, P, D>
 (
 	mut parsed_input_cursor: Cursor <'a>,
 	mut orig_pattern_cursor: Cursor <'b>
 )
 -> Result <TokenStream>
-where P: CursorParse + DummyTokens + ToTokens
+where
+	P: CursorParse + ToTokens,
+	D: DummyTokens <P>
 {
 	let mut output_tokens = TokenStream::new ();
 
@@ -180,7 +184,7 @@ where P: CursorParse + DummyTokens + ToTokens
 			}
 		}
 
-		(parsed_input_cursor, orig_pattern_cursor) = reconstruct_step::<P>
+		(parsed_input_cursor, orig_pattern_cursor) = reconstruct_step::<P, D>
 		(
 			parsed_input_cursor,
 			orig_pattern_cursor,
@@ -189,17 +193,19 @@ where P: CursorParse + DummyTokens + ToTokens
 	}
 }
 
-pub fn reconstruct_pattern_tokens <P>
+pub fn reconstruct_pattern_tokens <P, D>
 (
 	parsed_tokens: TokenStream,
 	orig_pattern_tokens: &TokenBuffer
 )
 -> Result <TokenStream>
-where P: CursorParse + DummyTokens + ToTokens
+where
+	P: CursorParse + ToTokens,
+	D: DummyTokens <P>
 {
 	let parsed_tokens = TokenBuffer::new2 (parsed_tokens);
 
-	reconstruct_stream::<P>
+	reconstruct_stream::<P, D>
 	(
 		parsed_tokens . begin (),
 		orig_pattern_tokens . begin ()

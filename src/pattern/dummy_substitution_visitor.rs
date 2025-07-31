@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::marker::PhantomData;
 
 use proc_macro2::{TokenStream, Literal, Group, Delimiter};
 use proc_macro2::extra::DelimSpan;
@@ -7,16 +8,17 @@ use quote::{ToTokens, TokenStreamExt};
 
 use super::{PatternVisitor, PunctGroup, DummyTokens, ParameterCollector, MergeableBindings};
 
-pub struct DummySubstitutionVisitor
+pub struct DummySubstitutionVisitor <D>
 {
-	tokens: TokenStream
+	tokens: TokenStream,
+	_d: PhantomData <D>
 }
 
-impl DummySubstitutionVisitor
+impl <D> DummySubstitutionVisitor <D>
 {
 	pub fn new () -> Self
 	{
-		Self {tokens: TokenStream::new ()}
+		Self {tokens: TokenStream::new (), _d: PhantomData::default ()}
 	}
 
 	pub fn into_tokens (self) -> TokenStream
@@ -25,15 +27,15 @@ impl DummySubstitutionVisitor
 	}
 }
 
-impl <P> PatternVisitor <P> for DummySubstitutionVisitor
-where P: DummyTokens
+impl <D, P> PatternVisitor <P> for DummySubstitutionVisitor <D>
+where D: DummyTokens <P>
 {
 	type Error = Infallible;
 	type SubVisitor = Self;
 
 	fn visit_parameter (&mut self, parameter: P) -> Result <(), Self::Error>
 	{
-		self . tokens . extend (parameter . dummy_tokens ());
+		self . tokens . extend (D::dummy_tokens (&parameter));
 
 		Ok (())
 	}
@@ -82,18 +84,24 @@ where P: DummyTokens
 	}
 }
 
-pub struct DummySubstitutionCollectorVisitor <C>
+pub struct DummySubstitutionCollectorVisitor <C, D>
 {
 	collector: C,
-	tokens: TokenStream
+	tokens: TokenStream,
+	_d: PhantomData <D>
 }
 
-impl <C> DummySubstitutionCollectorVisitor <C>
+impl <C, D> DummySubstitutionCollectorVisitor <C, D>
 {
 	pub fn new () -> Self
 	where C: Default
 	{
-		Self {collector: C::default (), tokens: TokenStream::new ()}
+		Self
+		{
+			collector: C::default (),
+			tokens: TokenStream::new (),
+			_d: PhantomData::default ()
+		}
 	}
 
 	pub fn into_collector_and_tokens (self) -> (C, TokenStream)
@@ -102,17 +110,17 @@ impl <C> DummySubstitutionCollectorVisitor <C>
 	}
 }
 
-impl <C, P> PatternVisitor <P> for DummySubstitutionCollectorVisitor <C>
+impl <C, D, P> PatternVisitor <P> for DummySubstitutionCollectorVisitor <C, D>
 where
 	C: Default + ParameterCollector <P> + MergeableBindings,
-	P: DummyTokens
+	D: DummyTokens <P>
 {
 	type Error = C::Error;
 	type SubVisitor = Self;
 
 	fn visit_parameter (&mut self, parameter: P) -> Result <(), Self::Error>
 	{
-		self . tokens . extend (parameter . dummy_tokens ());
+		self . tokens . extend (D::dummy_tokens (&parameter));
 
 		self . collector . add_parameter (parameter);
 

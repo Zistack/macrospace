@@ -184,12 +184,14 @@ where P: CursorParse
 		Self::visit_pattern_cursor (cursor, visitor)
 	}
 
-	pub fn validate_as <T> (&mut self) -> syn::parse::Result <()>
+	pub fn validate_as <T, D> (&mut self) -> syn::parse::Result <()>
 	where
-		P: CursorParse + DummyTokens + ToTokens,
-		T: Parse + ToTokens
+		P: CursorParse + ToTokens,
+		T: Parse + ToTokens,
+		D: DummyTokens <P>
 	{
-		let mut dummy_substitution_visitor = DummySubstitutionVisitor::new ();
+		let mut dummy_substitution_visitor =
+			DummySubstitutionVisitor::<D>::new ();
 
 		let _ = self . visit_pattern (&mut dummy_substitution_visitor);
 
@@ -201,7 +203,7 @@ where P: CursorParse
 
 		self . pattern_tokens = TokenBuffer::new2
 		(
-			reconstruct_pattern_tokens::<P>
+			reconstruct_pattern_tokens::<P, D>
 			(
 				parsed_tokens,
 				&self . pattern_tokens
@@ -211,15 +213,17 @@ where P: CursorParse
 		Ok (())
 	}
 
-	pub fn validate_as_and_collect <T, C> (&mut self) -> syn::parse::Result <C>
+	pub fn validate_as_and_collect <T, C, D> (&mut self)
+	-> syn::parse::Result <C>
 	where
-		P: CursorParse + DummyTokens + ToTokens,
+		P: CursorParse + ToTokens,
 		T: Parse + ToTokens,
 		C: Default + ParameterCollector <P> + MergeableBindings,
-		C::Error: Into <syn::parse::Error>
+		C::Error: Into <syn::parse::Error>,
+		D: DummyTokens <P>
 	{
 		let mut dummy_substitution_visitor =
-			DummySubstitutionCollectorVisitor::new ();
+			DummySubstitutionCollectorVisitor::<C, D>::new ();
 
 		self
 			. visit_pattern (&mut dummy_substitution_visitor)
@@ -233,7 +237,7 @@ where P: CursorParse
 
 		self . pattern_tokens = TokenBuffer::new2
 		(
-			reconstruct_pattern_tokens::<P>
+			reconstruct_pattern_tokens::<P, D>
 			(
 				parsed_tokens,
 				&self . pattern_tokens
