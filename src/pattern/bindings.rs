@@ -75,7 +75,7 @@ where T: ToTokens
 			self . second_value,
 			format!
 			(
-				"parameter {} is already bound to `{}`",
+				"parameter `{}` is already bound to `{}`",
 				self . ident,
 				self . first_value . to_token_stream ()
 			)
