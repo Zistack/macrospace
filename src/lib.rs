@@ -11,6 +11,7 @@ pub use macrospace_macros::{
 	invoke_item_macro,
 	item,
 	import,
+	import_exclusive,
 	invoke,
 	parse_args
 };

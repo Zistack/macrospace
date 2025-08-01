@@ -35,6 +35,12 @@ pub fn import (attr: TokenStream, item: TokenStream) -> TokenStream
 	import::import_impl (attr, item)
 }
 
+#[proc_macro_attribute]
+pub fn import_exclusive (attr: TokenStream, item: TokenStream) -> TokenStream
+{
+	import::import_exclusive_impl (attr, item)
+}
+
 #[proc_macro]
 pub fn invoke (input: TokenStream) -> TokenStream
 {
