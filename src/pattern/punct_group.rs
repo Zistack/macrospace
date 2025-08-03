@@ -32,7 +32,14 @@ impl CursorParse for PunctGroup
 			}
 		}
 
-		Some ((Self {puncts}, cursor))
+		if puncts . is_empty ()
+		{
+			None
+		}
+		else
+		{
+			Some ((Self {puncts}, cursor))
+		}
 	}
 }
 
@@ -84,7 +91,7 @@ impl ToTokens for PunctGroup
 			None => { return; }
 		};
 
-		for (punct_char, punct_span) in &self . puncts
+		for (punct_char, punct_span) in punct_iter
 		{
 			let mut punct = Punct::new (*punct_char, Spacing::Joint);
 			punct . set_span (*punct_span);
