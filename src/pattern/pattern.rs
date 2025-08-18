@@ -285,10 +285,10 @@ where P: CursorParse
 		Ok (collect_visitor . into_collector ())
 	}
 
-	pub fn substitute <B> (&self, bindings: B) -> Result <TokenStream, B::Error>
+	pub fn substitute <B> (&self, bindings: &B) -> Result <TokenStream, B::Error>
 	where B: SubstitutionBindings <P>
 	{
-		let mut substitution_visitor = SubstitutionVisitor::new (&bindings);
+		let mut substitution_visitor = SubstitutionVisitor::new (bindings);
 
 		self . visit_pattern (&mut substitution_visitor)?;
 
