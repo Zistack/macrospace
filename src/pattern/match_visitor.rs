@@ -4,7 +4,8 @@ use std::marker::PhantomData;
 use proc_macro2::{Literal, Delimiter};
 use proc_macro2::extra::DelimSpan;
 use syn::{Ident, parenthesized, braced, bracketed};
-use syn::parse::{ParseBuffer};
+use syn::ext::IdentExt;
+use syn::parse::ParseBuffer;
 
 use super::{PunctGroup, PatternVisitor, MatchBindings, MergeableBindings};
 
@@ -52,7 +53,7 @@ where
 
 	fn visit_ident (&mut self, ident: Ident) -> Result <(), Self::Error>
 	{
-		let input_ident: Ident = self . input . borrow () . parse ()?;
+		let input_ident: Ident = Ident::parse_any (self . input . borrow ())?;
 
 		if input_ident != ident
 		{
