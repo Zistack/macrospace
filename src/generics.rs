@@ -1,14 +1,10 @@
 use syn::{
-	Path,
-	PathArguments,
-	GenericArgument,
 	Generics,
 	WhereClause,
 	GenericParam,
 	Token
 };
 use syn::punctuated::Punctuated;
-use syn::parse::{Result, Error};
 
 pub fn combine_generics <const N: usize> (parts: [Generics; N]) -> Generics
 {
@@ -63,34 +59,4 @@ pub fn get_num_required_arguments
 	}
 
 	count
-}
-
-pub fn get_path_arguments (path: &Path)
--> Result <Punctuated <GenericArgument, Token! [,]>>
-{
-	path
-		. segments
-		. last ()
-		. ok_or
-		(
-			Error::new_spanned (path, "Path must be nonempty")
-		)
-		. and_then
-		(
-			|last_segment|
-			match &last_segment . arguments
-			{
-				PathArguments::AngleBracketed (arguments) =>
-					Ok (arguments . args . clone ()),
-				PathArguments::Parenthesized (_) => Err
-				(
-					Error::new_spanned
-					(
-						path,
-						"Parenthesized path arguments are not supported"
-					)
-				),
-				_ => Ok (Punctuated::new ())
-			}
-		)
 }

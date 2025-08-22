@@ -15,7 +15,7 @@ use syn::punctuated::Punctuated;
 use syn::parse::Result;
 use syn::fold::Fold;
 
-use crate::generics::get_path_arguments;
+use crate::path_utils::get_path_arguments;
 
 use super::substitutions::Substitutions;
 
@@ -75,7 +75,7 @@ pub fn substitute_arguments_for_struct
 	let mut substitutions = Substitutions::try_from_path_arguments
 	(
 		&struct_item . generics . params,
-		&get_path_arguments (struct_path)?
+		&get_path_arguments (struct_path)? . cloned () . unwrap_or_default ()
 	)?;
 
 	struct_item . generics =
@@ -96,7 +96,7 @@ pub fn substitute_arguments_for_enum
 	let mut substitutions = Substitutions::try_from_path_arguments
 	(
 		&enum_item . generics . params,
-		&get_path_arguments (enum_path)?
+		&get_path_arguments (enum_path)? . cloned () . unwrap_or_default ()
 	)?;
 
 	enum_item . generics =
@@ -117,7 +117,7 @@ pub fn substitute_arguments_for_trait
 	let mut substitutions = Substitutions::try_from_path_arguments
 	(
 		&trait_item . generics . params,
-		&get_path_arguments (trait_path)?
+		&get_path_arguments (trait_path)? . cloned () . unwrap_or_default ()
 	)?;
 
 	trait_item . generics =
@@ -134,7 +134,7 @@ pub fn substitute_arguments_for_fn (mut fn_item: ItemFn, fn_path: &Path)
 	let mut substitutions = Substitutions::try_from_path_arguments
 	(
 		&fn_item . sig . generics . params,
-		&get_path_arguments (fn_path)?
+		&get_path_arguments (fn_path)? . cloned () . unwrap_or_default ()
 	)?;
 
 	fn_item . sig . generics =
@@ -155,7 +155,7 @@ pub fn substitute_arguments_for_derive_input
 	let mut substitutions = Substitutions::try_from_path_arguments
 	(
 		&derive_input . generics . params,
-		&get_path_arguments (derive_input_path)?
+		&get_path_arguments (derive_input_path)? . cloned () . unwrap_or_default ()
 	)?;
 
 	derive_input . generics =
