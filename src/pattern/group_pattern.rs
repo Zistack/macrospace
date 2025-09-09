@@ -1,0 +1,119 @@
+use proc_macro2::{TokenStream, Delimiter, Group};
+use proc_macro2::extra::DelimSpan;
+use syn::{Ident, parse2};
+use syn::parse::{Parse, ParseStream};
+use quote::{ToTokens, TokenStreamExt};
+
+use super::{
+	ParameterSchema,
+	NoParameterInRepetition,
+	StructuredBindingView,
+	ParameterBindingTypeMismatch,
+	PatternBuffer,
+	PatternVisitor
+};
+
+#[derive (Clone, Debug)]
+pub struct GroupPattern <T>
+{
+	pub delimiter: Delimiter,
+	pub delim_span: DelimSpan,
+	pub inner_pattern: PatternBuffer <T>
+}
+
+impl <T> Parse for GroupPattern <T>
+where T: Parse
+{
+	fn parse (input: ParseStream <'_>) -> syn::Result <Self>
+	{
+		Ok (Self::try_from (input . parse::<Group> ()?)?)
+	}
+}
+
+impl <T> GroupPattern <T>
+{
+	pub fn referenced_identifiers (&self) -> impl Iterator <Item = &Ident>
+	{
+		self . inner_pattern . referenced_identifiers ()
+	}
+
+	pub fn extract_schema (&self)
+	-> Result <ParameterSchema, NoParameterInRepetition <T>>
+	where T: Clone
+	{
+		self . inner_pattern . extract_schema ()
+	}
+
+	pub fn visit <V> (&self, visitor: &mut V) -> Result <(), V::Error>
+	where V: PatternVisitor <T>
+	{
+		let mut group_visitor = visitor . pre_visit_group
+		(
+			self . delimiter,
+			self . delim_span
+		)?;
+
+		self . inner_pattern . visit (&mut group_visitor)?;
+
+		visitor . post_visit_group
+		(
+			self . delimiter,
+			self . delim_span, group_visitor
+		)?;
+
+		Ok (())
+	}
+
+	pub fn specialize <'a, V>
+	(
+		&self,
+		bindings: &StructuredBindingView <'a, V>,
+		pattern_buffer: &mut PatternBuffer <T>
+	)
+	-> Result <(), ParameterBindingTypeMismatch>
+	where T: Clone
+	{
+		let delimiter = self . delimiter;
+		let delim_span = self . delim_span;
+		let mut inner_pattern = PatternBuffer::new ();
+
+		self . inner_pattern . specialize (bindings, &mut inner_pattern)?;
+
+		pattern_buffer . append_group
+		(
+			Self {delimiter, delim_span, inner_pattern}
+		);
+
+		Ok (())
+	}
+}
+
+impl <T> ToTokens for GroupPattern <T>
+where T: ToTokens
+{
+	fn to_tokens (&self, tokens: &mut TokenStream)
+	{
+		let group = Group::new
+		(
+			self . delimiter,
+			self . inner_pattern . to_token_stream ()
+		);
+
+		tokens . append (group);
+	}
+}
+
+impl <T> TryFrom <Group> for GroupPattern <T>
+where T: Parse
+{
+	type Error = syn::Error;
+
+	fn try_from (group: Group) -> Result <Self, Self::Error>
+	{
+		let delimiter = group . delimiter ();
+		let delim_span = group . delim_span ();
+		let inner_pattern = parse2 (group . stream ())?;
+
+		Ok (Self {delimiter, delim_span, inner_pattern})
+	}
+}

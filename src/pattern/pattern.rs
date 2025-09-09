@@ -1,257 +1,85 @@
 use std::fmt::{Debug, Display, Formatter};
-use std::marker::PhantomData;
 
 use proc_macro2::TokenStream;
-use syn::parse2;
-use syn::buffer::{Cursor, TokenBuffer};
 use syn::parse::{Parse, ParseStream, Parser};
-use quote::{ToTokens, TokenStreamExt};
+use quote::ToTokens;
 
 use super::{
-	PunctGroup,
-	MatchBindings,
-	MergeableBindings,
-	ParameterCollector,
-	SubstitutionBindings,
+	ParameterSchema,
+	StructuredBindings,
+	ParameterBindingTypeMismatch,
+	PatternBuffer,
 	PatternVisitor,
-	DummyTokens
+	ParseBinding,
+	MatchVisitor,
+	TokenizeBinding,
+	SubstitutionVisitor,
+	SubstitutionError
 };
-use super::cursor_parse::CursorParse;
-use super::match_visitor::MatchVisitor;
-use super::collect_visitor::CollectVisitor;
-use super::substitution_visitor::SubstitutionVisitor;
-use super::dummy_substitution_visitor::*;
-use super::reconstruct::reconstruct_pattern_tokens;
 
-pub struct Pattern <P>
+#[derive (Clone, Debug)]
+pub struct Pattern <T>
 {
-	pattern_tokens: TokenBuffer,
-	_parameter_type: PhantomData <P>
+	pattern_buffer: PatternBuffer <T>,
+	parameter_schema: ParameterSchema
 }
 
-impl <P> Clone for Pattern <P>
+impl <T> Parse for Pattern <T>
+where T: Clone + Parse + ToTokens
 {
-	fn clone (&self) -> Self
+	fn parse (input: ParseStream <'_>) -> syn::Result <Self>
 	{
-		Self
-		{
-			pattern_tokens: TokenBuffer::new2
-			(
-				self . pattern_tokens . begin () . token_stream ()
-			),
-			_parameter_type: PhantomData::default ()
-		}
+		let pattern_buffer: PatternBuffer <T> = input . parse ()?;
+
+		let parameter_schema = pattern_buffer
+			. extract_schema ()
+			. map_err (Into::<syn::Error>::into)?;
+
+		parameter_schema
+			. assert_parameters_disjoint ()
+			. map_err (Into::<syn::Error>::into)?;
+
+		Ok (Self {pattern_buffer, parameter_schema})
 	}
 }
 
-impl <P> From <TokenStream> for Pattern <P>
-{
-	fn from (tokens: TokenStream) -> Self
-	{
-		Self
-		{
-			pattern_tokens: TokenBuffer::new2 (tokens),
-			_parameter_type: PhantomData::default ()
-		}
-	}
-}
-
-impl <P> Debug for Pattern <P>
-{
-	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
-	{
-		f . debug_struct ("Pattern")
-			. field
-			(
-				"pattern_tokens",
-				&self . pattern_tokens . begin () . token_stream ()
-			)
-			. field ("_parameter_type", &self . _parameter_type)
-			. finish ()
-	}
-}
-
-impl <P> Display for Pattern <P>
-{
-	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
-	{
-		Display::fmt (&self . pattern_tokens . begin () . token_stream (), f)
-	}
-}
-
-impl <P> Parse for Pattern <P>
-{
-	fn parse (input: ParseStream <'_>) -> syn::parse::Result <Self>
-	{
-		Ok (<Self as From <TokenStream>>::from (input . parse ()?))
-	}
-}
-
-impl <P> ToTokens for Pattern <P>
+impl <T> ToTokens for Pattern <T>
+where T: ToTokens
 {
 	fn to_tokens (&self, tokens: &mut TokenStream)
 	{
-		let mut cursor = self . pattern_tokens . begin ();
-		while let Some ((token_tree, next_cursor)) = cursor . token_tree ()
-		{
-			tokens . append (token_tree);
-			cursor = next_cursor;
-		}
+		self . pattern_buffer . to_tokens (tokens);
 	}
 }
 
-impl <P> Pattern <P>
-where P: CursorParse
+impl <T> Display for Pattern <T>
+where T: ToTokens
 {
-	fn visit_pattern_cursor <V> (mut cursor: Cursor <'_>, visitor: &mut V)
-	-> Result <(), <V as PatternVisitor <P>>::Error>
-	where V: PatternVisitor <P>
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
 	{
-		loop
-		{
-			if let Some ((parameter, next_cursor)) = P::parse_from_cursor (cursor)
-			{
-				visitor . visit_parameter (parameter)?;
+		Display::fmt (&self . pattern_buffer . to_token_stream (), f)
+	}
+}
 
-				cursor = next_cursor;
-
-				continue;
-			}
-
-			if let Some ((ident, next_cursor)) = cursor . ident ()
-			{
-				visitor . visit_ident (ident)?;
-
-				cursor = next_cursor;
-
-				continue;
-			}
-
-			if let Some ((literal, next_cursor)) = cursor . literal ()
-			{
-				visitor . visit_literal (literal)?;
-
-				cursor = next_cursor;
-
-				continue;
-			}
-
-			if let Some ((punct_group, next_cursor)) =
-				PunctGroup::parse_from_cursor (cursor)
-			{
-				visitor . visit_punct_group (punct_group)?;
-
-				cursor = next_cursor;
-
-				continue;
-			}
-
-			if let Some ((group_cursor, delimiter, group_span, next_cursor)) =
-				cursor . any_group ()
-			{
-				let mut sub_visitor = visitor . pre_visit_group
-				(
-					delimiter,
-					group_span
-				)?;
-
-				Self::visit_pattern_cursor (group_cursor, &mut sub_visitor)?;
-
-				visitor . post_visit_group
-				(
-					delimiter,
-					group_span,
-					sub_visitor
-				)?;
-
-				cursor = next_cursor;
-
-				continue;
-			}
-
-			if cursor . eof () { return visitor . visit_end (); }
-
-			unreachable! ();
-		}
+impl <T> Pattern <T>
+{
+	pub fn is_parameters_superschema (&self, other: &Self) -> bool
+	{
+		self . parameter_schema . is_superschema (&other . parameter_schema)
 	}
 
 	pub fn visit_pattern <V> (&self, visitor: &mut V)
-	-> Result <(), <V as PatternVisitor <P>>::Error>
-	where V: PatternVisitor <P>
+	-> Result <(), <V as PatternVisitor <T>>::Error>
+	where V: PatternVisitor <T>
 	{
-		let cursor = self . pattern_tokens . begin ();
-
-		Self::visit_pattern_cursor (cursor, visitor)
+		self . pattern_buffer . visit (visitor)
 	}
 
-	pub fn validate_as <T, D> (&mut self) -> syn::parse::Result <()>
+	pub fn match_input <V> (&self, input: ParseStream <'_>)
+	-> syn::Result <StructuredBindings <V>>
 	where
-		P: CursorParse + ToTokens,
-		T: Parse + ToTokens,
-		D: DummyTokens <P>
-	{
-		let mut dummy_substitution_visitor =
-			DummySubstitutionVisitor::<D>::new ();
-
-		let _ = self . visit_pattern (&mut dummy_substitution_visitor);
-
-		let parsed_tokens = parse2::<T>
-		(
-			dummy_substitution_visitor . into_tokens ()
-		)?
-			. into_token_stream ();
-
-		self . pattern_tokens = TokenBuffer::new2
-		(
-			reconstruct_pattern_tokens::<P, D>
-			(
-				parsed_tokens,
-				&self . pattern_tokens
-			)?
-		);
-
-		Ok (())
-	}
-
-	pub fn validate_as_and_collect <T, C, D> (&mut self)
-	-> syn::parse::Result <C>
-	where
-		P: CursorParse + ToTokens,
-		T: Parse + ToTokens,
-		C: Default + ParameterCollector <P> + MergeableBindings,
-		C::Error: Into <syn::parse::Error>,
-		D: DummyTokens <P>
-	{
-		let mut dummy_substitution_visitor =
-			DummySubstitutionCollectorVisitor::<C, D>::new ();
-
-		self
-			. visit_pattern (&mut dummy_substitution_visitor)
-			. map_err (|e: C::Error| e . into ())?;
-
-		let (collector, substituted_tokens) =
-			dummy_substitution_visitor . into_collector_and_tokens ();
-
-		let parsed_tokens =
-			parse2::<T> (substituted_tokens)? . into_token_stream ();
-
-		self . pattern_tokens = TokenBuffer::new2
-		(
-			reconstruct_pattern_tokens::<P, D>
-			(
-				parsed_tokens,
-				&self . pattern_tokens
-			)?
-		);
-
-		Ok (collector)
-	}
-
-	pub fn match_input <B> (&self, input: ParseStream <'_>)
-	-> syn::parse::Result <B>
-	where
-		B: Default + MatchBindings <P> + MergeableBindings,
-		B::Error: Into <syn::parse::Error>
+		T: ParseBinding <V>,
+		V: Clone + PartialEq + Display
 	{
 		let mut match_visitor = MatchVisitor::new (input);
 
@@ -260,11 +88,11 @@ where P: CursorParse
 		Ok (match_visitor . into_bindings ())
 	}
 
-	pub fn match_tokens <B> (&self, tokens: TokenStream)
-	-> syn::parse::Result <B>
+	pub fn match_tokens <V> (&self, tokens: TokenStream)
+	-> syn::Result <StructuredBindings <V>>
 	where
-		B: Default + MatchBindings <P> + MergeableBindings,
-		B::Error: Into <syn::parse::Error>
+		T: ParseBinding <V>,
+		V: Clone + PartialEq + Display
 	{
 		let parser = |input: ParseStream <'_>|
 		{
@@ -274,24 +102,33 @@ where P: CursorParse
 		parser . parse2 (tokens)
 	}
 
-	pub fn collect_parameters <C> (&self)
-	-> Result <C, <C as MergeableBindings>::Error>
-	where C: Default + ParameterCollector <P> + MergeableBindings
+	pub fn substitute <V> (&self, bindings: &StructuredBindings <V>)
+	-> Result <TokenStream, SubstitutionError <T, V>>
+	where T: TokenizeBinding <V>
 	{
-		let mut collect_visitor = CollectVisitor::new ();
-
-		self . visit_pattern (&mut collect_visitor)?;
-
-		Ok (collect_visitor . into_collector ())
-	}
-
-	pub fn substitute <B> (&self, bindings: &B) -> Result <TokenStream, B::Error>
-	where B: SubstitutionBindings <P>
-	{
-		let mut substitution_visitor = SubstitutionVisitor::new (bindings);
+		let mut substitution_visitor =
+			SubstitutionVisitor::new (bindings . view ());
 
 		self . visit_pattern (&mut substitution_visitor)?;
 
 		Ok (substitution_visitor . into_tokens ())
+	}
+
+	pub fn specialize <V> (&self, bindings: &StructuredBindings <V>)
+	-> Result <Self, ParameterBindingTypeMismatch>
+	where T: Clone + Debug
+	{
+		let mut pattern_buffer = PatternBuffer::new ();
+
+		self
+			. pattern_buffer
+			. specialize (&bindings . view (), &mut pattern_buffer)?;
+
+		// Because repetitions are fully instantiated if all bindings exist, the
+		// only remaining repetitions must yet have unbound parameters, and so
+		// this schema extraction will never return an error.
+		let parameter_schema = pattern_buffer . extract_schema () . unwrap ();
+
+		Ok (Self {pattern_buffer, parameter_schema})
 	}
 }
