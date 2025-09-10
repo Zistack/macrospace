@@ -7,7 +7,7 @@ use super::{
 	ParameterSchema,
 	NoParameterInRepetition,
 	StructuredBindingView,
-	ParameterBindingTypeMismatch,
+	StructuredBindingTypeMismatch,
 	PatternBuffer,
 	PatternVisitor,
 	OptionalVisitor,
@@ -102,7 +102,7 @@ impl <T> OptionalPattern <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), ParameterBindingTypeMismatch>
+	-> Result <(), StructuredBindingTypeMismatch>
 	where T: Clone
 	{
 		match bindings . project
@@ -244,7 +244,7 @@ impl <T> ZeroOrMorePattern <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), ParameterBindingTypeMismatch>
+	-> Result <(), StructuredBindingTypeMismatch>
 	where T: Clone
 	{
 		match bindings . project (self . inner_pattern . referenced_identifiers ())
@@ -412,7 +412,7 @@ impl <T> OneOrMorePattern <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), ParameterBindingTypeMismatch>
+	-> Result <(), StructuredBindingTypeMismatch>
 	where T: Clone
 	{
 		match bindings . project (self . inner_pattern . referenced_identifiers ())

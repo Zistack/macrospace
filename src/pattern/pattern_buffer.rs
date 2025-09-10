@@ -12,7 +12,7 @@ use super::{
 	Parameter,
 	ParameterSchema,
 	StructuredBindingView,
-	ParameterBindingTypeMismatch,
+	StructuredBindingTypeMismatch,
 	OptionalPattern,
 	ZeroOrMorePattern,
 	OneOrMorePattern,
@@ -273,7 +273,7 @@ impl <T> PatternBuffer <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), ParameterBindingTypeMismatch>
+	-> Result <(), StructuredBindingTypeMismatch>
 	where T: Clone
 	{
 		for pattern_item in &self . pattern_items

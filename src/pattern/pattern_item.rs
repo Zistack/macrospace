@@ -6,7 +6,7 @@ use quote::ToTokens;
 use super::{
 	Parameter,
 	StructuredBindingView,
-	ParameterBindingTypeMismatch,
+	StructuredBindingTypeMismatch,
 	OptionalPattern,
 	ZeroOrMorePattern,
 	OneOrMorePattern,
@@ -104,7 +104,7 @@ impl <T> PatternItem <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), ParameterBindingTypeMismatch>
+	-> Result <(), StructuredBindingTypeMismatch>
 	where T: Clone
 	{
 		match self

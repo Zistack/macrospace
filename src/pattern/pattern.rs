@@ -7,7 +7,7 @@ use quote::ToTokens;
 use super::{
 	ParameterSchema,
 	StructuredBindings,
-	ParameterBindingTypeMismatch,
+	StructuredBindingTypeMismatch,
 	PatternBuffer,
 	PatternVisitor,
 	ParseBinding,
@@ -115,7 +115,7 @@ impl <T> Pattern <T>
 	}
 
 	pub fn specialize <V> (&self, bindings: &StructuredBindings <V>)
-	-> Result <Self, ParameterBindingTypeMismatch>
+	-> Result <Self, StructuredBindingTypeMismatch>
 	where T: Clone + Debug
 	{
 		let mut pattern_buffer = PatternBuffer::new ();

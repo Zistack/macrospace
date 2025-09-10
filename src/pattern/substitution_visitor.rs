@@ -10,7 +10,7 @@ use super::{
 	Parameter,
 	StructuredBindingView,
 	StructuredBindingLookupError,
-	ParameterBindingTypeMismatch,
+	StructuredBindingTypeMismatch,
 	ParameterBindingNotFound,
 	PatternVisitor,
 	OptionalVisitor,
@@ -54,7 +54,7 @@ where T: TokenizeBinding <V>
 
 		parameter
 			. extra_tokens
-			. tokenize_binding (value, &mut self . tokens)
+			. tokenize (value, &mut self . tokens)
 			. map_err (SubstitutionError::Tokenize)?;
 
 		Ok (())
@@ -404,10 +404,10 @@ where T: TokenizeBinding <V>
 	}
 }
 
-impl <T, V> From <ParameterBindingTypeMismatch> for SubstitutionError <T, V>
+impl <T, V> From <StructuredBindingTypeMismatch> for SubstitutionError <T, V>
 where T: TokenizeBinding <V>
 {
-	fn from (e: ParameterBindingTypeMismatch) -> Self
+	fn from (e: StructuredBindingTypeMismatch) -> Self
 	{
 		Self::Lookup (e . into ())
 	}

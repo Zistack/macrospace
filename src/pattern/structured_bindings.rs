@@ -542,7 +542,7 @@ impl <'a, V> StructuredBindingView <'a, V>
 			Some (StructuredBinding::Value (value)) => Ok (value),
 			Some (s) => Err
 			(
-				ParameterBindingTypeMismatch::new
+				StructuredBindingTypeMismatch::new
 				(
 					ident . clone (),
 					s . ty (),
@@ -575,7 +575,7 @@ impl <'a, V> StructuredBindingView <'a, V>
 	}
 
 	pub fn get_optional_view (&self)
-	-> Result <Option <Self>, ParameterBindingTypeMismatch>
+	-> Result <Option <Self>, StructuredBindingTypeMismatch>
 	{
 		let mut map = HashMap::new ();
 
@@ -588,7 +588,7 @@ impl <'a, V> StructuredBindingView <'a, V>
 				StructuredBinding::Optional (None) => return Ok (None),
 				_ => return Err
 				(
-					ParameterBindingTypeMismatch::new
+					StructuredBindingTypeMismatch::new
 					(
 						ident . clone (),
 						binding . ty (),
@@ -602,7 +602,7 @@ impl <'a, V> StructuredBindingView <'a, V>
 	}
 
 	pub fn get_zero_or_more_view (&self, index: usize)
-	-> Result <Option <Self>, ParameterBindingTypeMismatch>
+	-> Result <Option <Self>, StructuredBindingTypeMismatch>
 	{
 		let mut map = HashMap::new ();
 
@@ -618,7 +618,7 @@ impl <'a, V> StructuredBindingView <'a, V>
 				},
 				_ => return Err
 				(
-					ParameterBindingTypeMismatch::new
+					StructuredBindingTypeMismatch::new
 					(
 						ident . clone (),
 						binding . ty (),
@@ -652,7 +652,7 @@ impl <'a, V> StructuredBindingView <'a, V>
 				},
 				_ => return Err
 				(
-					ParameterBindingTypeMismatch::new
+					StructuredBindingTypeMismatch::new
 					(
 						ident . clone (),
 						binding . ty (),
@@ -667,7 +667,7 @@ impl <'a, V> StructuredBindingView <'a, V>
 	}
 
 	pub fn get_one_or_more_view (&self, index: usize)
-	-> Result <Option <Self>, ParameterBindingTypeMismatch>
+	-> Result <Option <Self>, StructuredBindingTypeMismatch>
 	{
 		let mut map = HashMap::new ();
 
@@ -683,7 +683,7 @@ impl <'a, V> StructuredBindingView <'a, V>
 				},
 				_ => return Err
 				(
-					ParameterBindingTypeMismatch::new
+					StructuredBindingTypeMismatch::new
 					(
 						ident . clone (),
 						binding . ty (),
@@ -698,14 +698,14 @@ impl <'a, V> StructuredBindingView <'a, V>
 }
 
 #[derive (Clone, Debug)]
-pub struct ParameterBindingTypeMismatch
+pub struct StructuredBindingTypeMismatch
 {
 	parameter: Ident,
 	found: StructuredBindingType,
 	expected: StructuredBindingType
 }
 
-impl ParameterBindingTypeMismatch
+impl StructuredBindingTypeMismatch
 {
 	pub fn new
 	(
@@ -719,7 +719,7 @@ impl ParameterBindingTypeMismatch
 	}
 }
 
-impl Display for ParameterBindingTypeMismatch
+impl Display for StructuredBindingTypeMismatch
 {
 	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
 	{
@@ -736,20 +736,20 @@ impl Display for ParameterBindingTypeMismatch
 	}
 }
 
-impl Error for ParameterBindingTypeMismatch
+impl Error for StructuredBindingTypeMismatch
 {
 }
 
 #[derive (Clone, Debug)]
 pub enum StructuredBindingLookupError
 {
-	TypeMismatch (ParameterBindingTypeMismatch),
+	TypeMismatch (StructuredBindingTypeMismatch),
 	NotFound (ParameterBindingNotFound)
 }
 
-impl From <ParameterBindingTypeMismatch> for StructuredBindingLookupError
+impl From <StructuredBindingTypeMismatch> for StructuredBindingLookupError
 {
-	fn from (e: ParameterBindingTypeMismatch) -> Self
+	fn from (e: StructuredBindingTypeMismatch) -> Self
 	{
 		Self::TypeMismatch (e)
 	}

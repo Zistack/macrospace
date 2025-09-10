@@ -8,7 +8,7 @@ use super::{
 	ParameterSchema,
 	NoParameterInRepetition,
 	StructuredBindingView,
-	ParameterBindingTypeMismatch,
+	StructuredBindingTypeMismatch,
 	PatternBuffer,
 	PatternVisitor
 };
@@ -70,7 +70,7 @@ impl <T> GroupPattern <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), ParameterBindingTypeMismatch>
+	-> Result <(), StructuredBindingTypeMismatch>
 	where T: Clone
 	{
 		let delimiter = self . delimiter;

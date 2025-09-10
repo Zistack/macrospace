@@ -4,6 +4,6 @@ pub trait TokenizeBinding <V>
 {
 	type Error;
 
-	fn tokenize_binding (&self, binding: &V, tokens: &mut TokenStream)
+	fn tokenize (&self, binding: &V, tokens: &mut TokenStream)
 	-> Result <(), Self::Error>;
 }
