@@ -54,7 +54,7 @@ where T: TokenizeBinding <V>
 
 		parameter
 			. extra_tokens
-			. tokenize (value, &mut self . tokens)
+			. tokenize (&parameter . ident, value, &mut self . tokens)
 			. map_err (SubstitutionError::Tokenize)?;
 
 		Ok (())
