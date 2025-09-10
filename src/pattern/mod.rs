@@ -55,6 +55,9 @@ pub use pattern::*;
 
 
 
+mod type_annotation;
+pub use type_annotation::*;
+
 mod expect;
 pub use expect::*;
 
