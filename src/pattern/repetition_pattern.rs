@@ -7,12 +7,13 @@ use super::{
 	ParameterSchema,
 	NoParameterInRepetition,
 	StructuredBindingView,
-	StructuredBindingTypeMismatch,
+	SpecializationError,
 	PatternBuffer,
 	PatternVisitor,
 	OptionalVisitor,
 	ZeroOrMoreVisitor,
-	OneOrMoreVisitor
+	OneOrMoreVisitor,
+	TokenizeBinding
 };
 
 #[derive (Clone, Debug)]
@@ -102,8 +103,8 @@ impl <T> OptionalPattern <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), StructuredBindingTypeMismatch>
-	where T: Clone
+	-> Result <(), SpecializationError <T, V>>
+	where T: Clone + Parse + TokenizeBinding <V>
 	{
 		match bindings . project
 		(
@@ -244,8 +245,8 @@ impl <T> ZeroOrMorePattern <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), StructuredBindingTypeMismatch>
-	where T: Clone
+	-> Result <(), SpecializationError <T, V>>
+	where T: Clone + Parse + TokenizeBinding <V>
 	{
 		match bindings . project (self . inner_pattern . referenced_identifiers ())
 		{
@@ -412,8 +413,8 @@ impl <T> OneOrMorePattern <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), StructuredBindingTypeMismatch>
-	where T: Clone
+	-> Result <(), SpecializationError <T, V>>
+	where T: Clone + Parse + TokenizeBinding <V>
 	{
 		match bindings . project (self . inner_pattern . referenced_identifiers ())
 		{

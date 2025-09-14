@@ -553,6 +553,26 @@ impl <'a, V> StructuredBindingView <'a, V>
 		}
 	}
 
+	pub fn get_maybe_value (&self, ident: &Ident)
+	-> Result <Option <&V>, StructuredBindingTypeMismatch>
+	{
+		match self . map . get (ident)
+		{
+			None => Ok (None),
+			Some (StructuredBinding::Value (value)) => Ok (Some (value)),
+			Some (s) => Err
+			(
+				StructuredBindingTypeMismatch::new
+				(
+					ident . clone (),
+					s . ty (),
+					StructuredBindingType::Value
+				)
+					. into ()
+			)
+		}
+	}
+
 	pub fn project <'b, I> (&self, idents: I)
 	-> Result <Self, ParameterBindingNotFound>
 	where I: IntoIterator <Item = &'b Ident>
@@ -738,6 +758,14 @@ impl Display for StructuredBindingTypeMismatch
 
 impl Error for StructuredBindingTypeMismatch
 {
+}
+
+impl Into <syn::Error> for StructuredBindingTypeMismatch
+{
+	fn into (self) -> syn::Error
+	{
+		syn::Error::new_spanned (&self . parameter, &self)
+	}
 }
 
 #[derive (Clone, Debug)]

@@ -8,9 +8,10 @@ use super::{
 	ParameterSchema,
 	NoParameterInRepetition,
 	StructuredBindingView,
-	StructuredBindingTypeMismatch,
+	SpecializationError,
 	PatternBuffer,
-	PatternVisitor
+	PatternVisitor,
+	TokenizeBinding
 };
 
 #[derive (Clone, Debug)]
@@ -70,8 +71,8 @@ impl <T> GroupPattern <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), StructuredBindingTypeMismatch>
-	where T: Clone
+	-> Result <(), SpecializationError <T, V>>
+	where T: Clone + Parse + TokenizeBinding <V>
 	{
 		let delimiter = self . delimiter;
 		let delim_span = self . delim_span;

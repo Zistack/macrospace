@@ -145,52 +145,94 @@ impl ParameterSchema
 		Ok (disjoint_parameters)
 	}
 
-	fn is_nested_superschema
+	fn nested_get_any_ident (nested_schema: &Option <Box <Self>>)
+	-> Option <&Ident>
+	{
+		match nested_schema
+		{
+			Some (boxed_schema) => boxed_schema . get_any_ident (),
+			None => None
+		}
+	}
+
+	fn get_any_ident (&self) -> Option <&Ident>
+	{
+		if ! self . parameters . is_empty ()
+		{
+			Some (self . parameters . iter () . next () . unwrap ())
+		}
+		else if let Some (ident) =
+			Self::nested_get_any_ident (&self . optional_parameters)
+		{
+			Some (ident)
+		}
+		else if let Some (ident) =
+			Self::nested_get_any_ident (&self . zero_or_more_parameters)
+		{
+			Some (ident)
+		}
+		else if let Some (ident) =
+			Self::nested_get_any_ident (&self . one_or_more_parameters)
+		{
+			Some (ident)
+		}
+		else
+		{
+			None
+		}
+	}
+
+	fn assert_nested_superschema
 	(
 		self_nested_schema: &Option <Box <Self>>,
 		other_nested_schema: &Option <Box <Self>>
 	)
-	-> bool
+	-> Result <(), Ident>
 	{
 		match (self_nested_schema, other_nested_schema)
 		{
 			(Some (self_boxed_schema), Some (other_boxed_schema)) =>
-				self_boxed_schema . is_superschema (other_boxed_schema),
-			(None, Some (_)) => false,
-			_ => true
+				self_boxed_schema . assert_superschema (other_boxed_schema),
+			(None, Some (other_boxed_schema)) => Err
+			(
+				other_boxed_schema . get_any_ident () . unwrap () . clone ()
+			),
+			_ => Ok (())
 		}
 	}
 
-	pub fn is_superschema (&self, other: &Self) -> bool
+	pub fn assert_superschema (&self, other: &Self) -> Result <(), Ident>
 	{
 		for other_parameter in &other . parameters
 		{
 			if ! self . parameters . contains (other_parameter)
 			{
-				return false;
+				return Err (other_parameter . clone ());
 			}
 		}
 
-		Self::is_nested_superschema
+		Self::assert_nested_superschema
 		(
 			&self . optional_parameters,
 			&other . optional_parameters
-		)
-			&& Self::is_nested_superschema
-			(
-				&self . zero_or_more_parameters,
-				&other . zero_or_more_parameters
-			)
-			&& Self::is_nested_superschema
-			(
-				&self . one_or_more_parameters,
-				&other . one_or_more_parameters
-			)
+		)?;
+		Self::assert_nested_superschema
+		(
+			&self . zero_or_more_parameters,
+			&other . zero_or_more_parameters
+		)?;
+		Self::assert_nested_superschema
+		(
+			&self . one_or_more_parameters,
+			&other . one_or_more_parameters
+		)?;
+
+		Ok (())
 	}
 
-	pub fn is_subschema (&self, other: &Self) -> bool
+	pub fn assert_subschema (&self, other: &Self) -> Result <(), Ident>
 	{
-		other . is_superschema (self)
+		other . assert_superschema (self)
 	}
 }
 

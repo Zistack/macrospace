@@ -1,13 +1,14 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use proc_macro2::TokenStream;
+use syn::Ident;
 use syn::parse::{Parse, ParseStream, Parser};
 use quote::ToTokens;
 
 use super::{
 	ParameterSchema,
 	StructuredBindings,
-	StructuredBindingTypeMismatch,
+	SpecializationError,
 	PatternBuffer,
 	PatternVisitor,
 	ParseBinding,
@@ -63,9 +64,10 @@ where T: ToTokens
 
 impl <T> Pattern <T>
 {
-	pub fn is_parameters_superschema (&self, other: &Self) -> bool
+	pub fn assert_parameters_superschema <O> (&self, other: &Pattern <O>)
+	-> Result <(), Ident>
 	{
-		self . parameter_schema . is_superschema (&other . parameter_schema)
+		self . parameter_schema . assert_superschema (&other . parameter_schema)
 	}
 
 	pub fn visit_pattern <V> (&self, visitor: &mut V)
@@ -115,8 +117,8 @@ impl <T> Pattern <T>
 	}
 
 	pub fn specialize <V> (&self, bindings: &StructuredBindings <V>)
-	-> Result <Self, StructuredBindingTypeMismatch>
-	where T: Clone + Debug
+	-> Result <Self, SpecializationError <T, V>>
+	where T: Clone + Parse + Debug + TokenizeBinding <V>
 	{
 		let mut pattern_buffer = PatternBuffer::new ();
 

@@ -1,6 +1,9 @@
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
+
 use proc_macro2::{TokenStream, TokenTree, Punct, Literal};
 use syn::{Ident, Token};
-use syn::parse::{Parse, ParseStream};
+use syn::parse::{Parse, Parser, ParseStream};
 use quote::ToTokens;
 
 use super::{
@@ -13,7 +16,8 @@ use super::{
 	RepetitionPattern,
 	GroupPattern,
 	PatternBuffer,
-	PatternVisitor
+	PatternVisitor,
+	TokenizeBinding
 };
 
 #[derive (Clone, Debug)]
@@ -104,13 +108,44 @@ impl <T> PatternItem <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), StructuredBindingTypeMismatch>
-	where T: Clone
+	-> Result <(), SpecializationError <T, V>>
+	where T: Clone + Parse + TokenizeBinding <V>
 	{
 		match self
 		{
 			Self::Parameter (parameter) =>
-				Ok (pattern_buffer . append_parameter (parameter . clone ())),
+			{
+				match bindings . get_maybe_value (&parameter . ident)?
+				{
+					Some (value) =>
+					{
+						let mut value_tokens = TokenStream::new ();
+
+						parameter . extra_tokens . tokenize
+						(
+							&parameter . ident,
+							value,
+							&mut value_tokens
+						)
+							. map_err (SpecializationError::Tokenize)?;
+
+						let parser = |input: ParseStream <'_>|
+						{
+							while ! input . is_empty ()
+							{
+								pattern_buffer . append_item (input . parse ()?);
+							}
+
+							Ok (())
+						};
+
+						parser . parse2 (value_tokens)?;
+					},
+					None => pattern_buffer . append_parameter (parameter . clone ())
+				}
+
+				Ok (())
+			},
 			Self::Optional (optional) =>
 				optional . specialize (bindings, pattern_buffer),
 			Self::ZeroOrMore (zero_or_more) =>
@@ -144,6 +179,91 @@ where T: ToTokens
 			Self::Ident (ident) => ident . to_tokens (tokens),
 			Self::Punct (punct) => punct . to_tokens (tokens),
 			Self::Literal (literal) => literal . to_tokens (tokens)
+		}
+	}
+}
+
+#[derive (Clone)]
+pub enum SpecializationError <T, V>
+where T: TokenizeBinding <V>
+{
+	Mismatch (StructuredBindingTypeMismatch),
+	Tokenize (T::Error),
+	Parse (syn::Error)
+}
+
+impl <T, V> From <StructuredBindingTypeMismatch> for SpecializationError <T, V>
+where T: TokenizeBinding <V>
+{
+	fn from (e: StructuredBindingTypeMismatch) -> Self
+	{
+		Self::Mismatch (e)
+	}
+}
+
+impl <T, V> From <syn::Error> for SpecializationError <T, V>
+where T: TokenizeBinding <V>
+{
+	fn from (e: syn::Error) -> Self
+	{
+		Self::Parse (e)
+	}
+}
+
+impl <T, V> Debug for SpecializationError <T, V>
+where
+	T: TokenizeBinding <V>,
+	T::Error: Debug
+{
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	{
+		match self
+		{
+			Self::Mismatch (e) =>
+				f . debug_tuple ("Mismatch") . field (e) . finish (),
+			Self::Tokenize (e) =>
+				f . debug_tuple ("Tokenize") . field (e) . finish (),
+			Self::Parse (e) =>
+				f . debug_tuple ("Parse") . field (e) . finish ()
+		}
+	}
+}
+
+impl <T, V> Display for SpecializationError <T, V>
+where
+	T: TokenizeBinding <V>,
+	T::Error: Display
+{
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	{
+		match self
+		{
+			Self::Mismatch (e) => Display::fmt (e, f),
+			Self::Tokenize (e) => Display::fmt (e, f),
+			Self::Parse (e) => Display::fmt (e, f)
+		}
+	}
+}
+
+impl <T, V> Error for SpecializationError <T, V>
+where
+	T: TokenizeBinding <V>,
+	T::Error: Debug + Display
+{
+}
+
+impl <T, V> Into <syn::Error> for SpecializationError <T, V>
+where
+	T: TokenizeBinding <V>,
+	T::Error: Into <syn::Error>
+{
+	fn into (self) -> syn::Error
+	{
+		match self
+		{
+			Self::Mismatch (e) => e . into (),
+			Self::Tokenize (e) => e . into (),
+			Self::Parse (e) => e
 		}
 	}
 }

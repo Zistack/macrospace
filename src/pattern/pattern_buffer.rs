@@ -12,14 +12,15 @@ use super::{
 	Parameter,
 	ParameterSchema,
 	StructuredBindingView,
-	StructuredBindingTypeMismatch,
 	OptionalPattern,
 	ZeroOrMorePattern,
 	OneOrMorePattern,
 	RepetitionPattern,
 	GroupPattern,
 	PatternItem,
+	SpecializationError,
 	PatternVisitor,
+	TokenizeBinding
 };
 
 #[derive (Clone, Debug)]
@@ -273,8 +274,8 @@ impl <T> PatternBuffer <T>
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), StructuredBindingTypeMismatch>
-	where T: Clone
+	-> Result <(), SpecializationError <T, V>>
+	where T: Clone + Parse + TokenizeBinding <V>
 	{
 		for pattern_item in &self . pattern_items
 		{
