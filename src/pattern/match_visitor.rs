@@ -11,7 +11,9 @@ use syn::parse::discouraged::Speculative;
 
 use super::{
 	Parameter,
+	Index,
 	StructuredBindings,
+	VisitationError,
 	PatternVisitor,
 	OptionalVisitor,
 	ZeroOrMoreVisitor,
@@ -71,6 +73,19 @@ where
 		Ok (())
 	}
 
+	fn visit_index (&mut self, _index: &Index, i: usize)
+	-> Result <(), Self::Error>
+	{
+		if syn::Index::from (i) != self . input . borrow () . parse ()?
+		{
+			Err (syn::Error::new (self . input . borrow () . span (), format_args! ("expected {}", i)))
+		}
+		else
+		{
+			Ok (())
+		}
+	}
+
 	fn pre_visit_optional <'b, I> (&mut self, _repetition_parameters: I)
 	-> Result <Self::OptionalVisitor, Self::Error>
 	where I: IntoIterator <Item = &'b Ident>
@@ -110,12 +125,21 @@ where
 	(
 		&mut self,
 		repetition_parameters: I,
+		repetition_index_len: Option <(&Ident, usize)>,
 		zero_or_more_visitor: Self::ZeroOrMoreVisitor
 	)
 	-> Result <(), Self::Error>
 	where I: IntoIterator <Item = &'b Ident>
 	{
 		self . input . borrow () . advance_to (&zero_or_more_visitor . input);
+
+		if let Some ((index_ident, len)) = repetition_index_len
+		{
+			self
+				. bindings
+				. add_index_len (index_ident . clone (), len)
+				. map_err (Into::<syn::Error>::into)?;
+		}
 
 		self . bindings . add_zero_or_more_bindings
 		(
@@ -138,12 +162,21 @@ where
 	(
 		&mut self,
 		repetition_parameters: I,
+		repetition_index_len: Option <(&Ident, usize)>,
 		one_or_more_visitor: Self::OneOrMoreVisitor
 	)
 	-> Result <(), Self::Error>
 	where I: IntoIterator <Item = &'b Ident>
 	{
 		self . input . borrow () . advance_to (&one_or_more_visitor . input);
+
+		if let Some ((index_ident, len)) = repetition_index_len
+		{
+			self
+				. bindings
+				. add_index_len (index_ident . clone (), len)
+				. map_err (Into::<syn::Error>::into)?;
+		}
 
 		self . bindings . add_one_or_more_bindings
 		(
@@ -322,9 +355,9 @@ where
 	(
 		&mut self,
 		once_visitor: Self::OnceVisitor,
-		visit_result: Result <(), Self::Error>
+		visit_result: Result <(), VisitationError <Self::Error>>
 	)
-	-> Result <(), Self::Error>
+	-> Result <(), VisitationError <Self::Error>>
 	{
 		if visit_result . is_ok ()
 		{
@@ -375,9 +408,9 @@ where
 	(
 		&mut self,
 		iteration_visitor: Self::IterationVisitor,
-		visit_result: Result <(), Self::Error>
+		visit_result: Result <(), VisitationError <Self::Error>>
 	)
-	-> Result <(), Self::Error>
+	-> Result <(), VisitationError <Self::Error>>
 	{
 		if visit_result . is_ok ()
 		{
@@ -431,9 +464,9 @@ where
 	(
 		&mut self,
 		iteration_visitor: Self::IterationVisitor,
-		visit_result: Result <(), Self::Error>
+		visit_result: Result <(), VisitationError <Self::Error>>
 	)
-	-> Result <(), Self::Error>
+	-> Result <(), VisitationError <Self::Error>>
 	{
 		if visit_result . is_ok ()
 		{

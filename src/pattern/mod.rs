@@ -1,11 +1,17 @@
 mod parameter;
 pub use parameter::*;
 
+mod index;
+pub use index::*;
+
 mod parameter_schema;
 use parameter_schema::*;
 
 mod structured_bindings;
 pub use structured_bindings::*;
+
+mod index_bindings;
+use index_bindings::*;
 
 
 
@@ -39,14 +45,6 @@ pub use tokenize_binding::*;
 
 mod substitution_visitor;
 use substitution_visitor::*;
-
-
-
-// mod dummy_tokens;
-// pub use dummy_tokens::*;
-
-// mod dummy_substitution_visitor;
-// use dummy_substitution_visitor::*
 
 
 

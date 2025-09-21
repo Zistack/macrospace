@@ -8,12 +8,17 @@ use quote::ToTokens;
 
 use super::{
 	Parameter,
+	Index,
+	ParameterBindingNotFound,
 	StructuredBindingView,
 	StructuredBindingTypeMismatch,
+	StructuredBindingLookupError,
+	IndexBindings,
 	OptionalPattern,
 	ZeroOrMorePattern,
 	OneOrMorePattern,
 	RepetitionPattern,
+	RepetitionLenMismatch,
 	GroupPattern,
 	PatternBuffer,
 	PatternVisitor,
@@ -24,6 +29,7 @@ use super::{
 pub enum PatternItem <T>
 {
 	Parameter (Parameter <T>),
+	Index (Index),
 	Optional (OptionalPattern <T>),
 	ZeroOrMore (ZeroOrMorePattern <T>),
 	OneOrMore (OneOrMorePattern <T>),
@@ -44,7 +50,11 @@ where T: Parse
 			{
 				Ok (Self::Parameter (input . parse ()?))
 			}
-			else if input . peek2 (syn::token::Paren)
+			else if input . peek2 (syn::token::Pound)
+			{
+				Ok (Self::Index (input . parse ()?))
+			}
+			else if input . peek2 (syn::token::Bracket) || input . peek2 (syn::token::Paren)
 			{
 				let repetition: RepetitionPattern <T> = input . parse ()?;
 
@@ -86,29 +96,49 @@ where T: Parse
 
 impl <T> PatternItem <T>
 {
-	pub fn visit <V> (&self, visitor: &mut V) -> Result <(), V::Error>
+	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)
+	-> Result <(), VisitationError <V::Error>>
 	where V: PatternVisitor <T>
 	{
 		match self
 		{
-			Self::Parameter (parameter) => visitor . visit_parameter (parameter),
-			Self::Optional (optional) => optional . visit (visitor),
-			Self::ZeroOrMore (zero_or_more) => zero_or_more . visit (visitor),
-			Self::OneOrMore (one_or_more) => one_or_more . visit (visitor),
-			Self::Group (group) => group . visit (visitor),
-			Self::Ident (ident) => visitor . visit_ident (ident),
-			Self::Punct (punct) => visitor . visit_punct (punct),
-			Self::Literal (literal) => visitor . visit_literal (literal)
+			Self::Parameter (parameter) => visitor
+				. visit_parameter (parameter)
+				. map_err (VisitationError::Visitor),
+			Self::Index (index) => visitor
+				. visit_index
+				(
+					index,
+					index_bindings . get_index (&index . ident)?
+				)
+				. map_err (VisitationError::Visitor),
+			Self::Optional (optional) => optional
+				. visit (index_bindings, visitor),
+			Self::ZeroOrMore (zero_or_more) => zero_or_more
+				. visit (index_bindings, visitor),
+			Self::OneOrMore (one_or_more) => one_or_more
+				. visit (index_bindings, visitor),
+			Self::Group (group) => group . visit (index_bindings, visitor),
+			Self::Ident (ident) => visitor
+				. visit_ident (ident)
+				. map_err (VisitationError::Visitor),
+			Self::Punct (punct) => visitor
+				. visit_punct (punct)
+				. map_err (VisitationError::Visitor),
+			Self::Literal (literal) => visitor
+				. visit_literal (literal)
+				. map_err (VisitationError::Visitor)
 		}
 	}
 
 	pub fn specialize <'a, V>
 	(
 		&self,
+		index_bindings: &IndexBindings,
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), SpecializationError <T, V>>
+	-> Result <(), SpecializationError <T::Error>>
 	where T: Clone + Parse + TokenizeBinding <V>
 	{
 		match self
@@ -146,14 +176,24 @@ impl <T> PatternItem <T>
 
 				Ok (())
 			},
+			Self::Index (index) =>
+			{
+				match index_bindings . get_maybe_index (&index . ident)
+				{
+					Some (i) => pattern_buffer . append_literal (Literal::usize_unsuffixed (i)),
+					None => pattern_buffer . append_index (index . clone ())
+				}
+
+				Ok (())
+			},
 			Self::Optional (optional) =>
-				optional . specialize (bindings, pattern_buffer),
+				optional . specialize (index_bindings, bindings, pattern_buffer),
 			Self::ZeroOrMore (zero_or_more) =>
-				zero_or_more . specialize (bindings, pattern_buffer),
+				zero_or_more . specialize (index_bindings, bindings, pattern_buffer),
 			Self::OneOrMore (one_or_more) =>
-				one_or_more . specialize (bindings, pattern_buffer),
+				one_or_more . specialize (index_bindings, bindings, pattern_buffer),
 			Self::Group (group) =>
-				group . specialize (bindings, pattern_buffer),
+				group . specialize (index_bindings, bindings, pattern_buffer),
 			Self::Ident (ident) =>
 				Ok (pattern_buffer . append_ident (ident . clone ())),
 			Self::Punct (punct) =>
@@ -172,6 +212,7 @@ where T: ToTokens
 		match self
 		{
 			Self::Parameter (parameter) => parameter . to_tokens (tokens),
+			Self::Index (index) => index . to_tokens (tokens),
 			Self::Optional (optional) => optional . to_tokens (tokens),
 			Self::ZeroOrMore (zero_or_more) => zero_or_more . to_tokens (tokens),
 			Self::OneOrMore (one_or_more) => one_or_more . to_tokens (tokens),
@@ -183,26 +224,86 @@ where T: ToTokens
 	}
 }
 
-#[derive (Clone)]
-pub enum SpecializationError <T, V>
-where T: TokenizeBinding <V>
+#[derive (Clone, Debug)]
+pub enum VisitationError <E>
 {
-	Mismatch (StructuredBindingTypeMismatch),
-	Tokenize (T::Error),
-	Parse (syn::Error)
+	IndexLookup (ParameterBindingNotFound),
+	Visitor (E)
 }
 
-impl <T, V> From <StructuredBindingTypeMismatch> for SpecializationError <T, V>
-where T: TokenizeBinding <V>
+impl <E> From <ParameterBindingNotFound> for VisitationError <E>
 {
-	fn from (e: StructuredBindingTypeMismatch) -> Self
+	fn from (e: ParameterBindingNotFound) -> Self
 	{
-		Self::Mismatch (e)
+		Self::IndexLookup (e)
 	}
 }
 
-impl <T, V> From <syn::Error> for SpecializationError <T, V>
-where T: TokenizeBinding <V>
+impl <E> Display for VisitationError <E>
+where E: Display
+{
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	{
+		match self
+		{
+			Self::IndexLookup (e) => Display::fmt (e, f),
+			Self::Visitor (e) => Display::fmt (e, f)
+		}
+	}
+}
+
+impl <E> Error for VisitationError <E>
+where E: Debug + Display
+{
+}
+
+impl <E> Into <syn::Error> for VisitationError <E>
+where E: Into <syn::Error>
+{
+	fn into (self) -> syn::Error
+	{
+		match self
+		{
+			Self::IndexLookup (e) => e . into (),
+			Self::Visitor (e) => e . into ()
+		}
+	}
+}
+
+#[derive (Clone, Debug)]
+pub enum SpecializationError <E>
+{
+	Lookup (StructuredBindingLookupError),
+	LenMismatch (RepetitionLenMismatch),
+	Tokenize (E),
+	Parse (syn::Error)
+}
+
+impl <E> From <StructuredBindingLookupError> for SpecializationError <E>
+{
+	fn from (e: StructuredBindingLookupError) -> Self
+	{
+		Self::Lookup (e)
+	}
+}
+
+impl <E> From <StructuredBindingTypeMismatch> for SpecializationError <E>
+{
+	fn from (e: StructuredBindingTypeMismatch) -> Self
+	{
+		Self::Lookup (e . into ())
+	}
+}
+
+impl <E> From <RepetitionLenMismatch> for SpecializationError <E>
+{
+	fn from (e: RepetitionLenMismatch) -> Self
+	{
+		Self::LenMismatch (e)
+	}
+}
+
+impl <E> From <syn::Error> for SpecializationError <E>
 {
 	fn from (e: syn::Error) -> Self
 	{
@@ -210,58 +311,35 @@ where T: TokenizeBinding <V>
 	}
 }
 
-impl <T, V> Debug for SpecializationError <T, V>
-where
-	T: TokenizeBinding <V>,
-	T::Error: Debug
+impl <E> Display for SpecializationError <E>
+where E: Display
 {
 	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
 	{
 		match self
 		{
-			Self::Mismatch (e) =>
-				f . debug_tuple ("Mismatch") . field (e) . finish (),
-			Self::Tokenize (e) =>
-				f . debug_tuple ("Tokenize") . field (e) . finish (),
-			Self::Parse (e) =>
-				f . debug_tuple ("Parse") . field (e) . finish ()
-		}
-	}
-}
-
-impl <T, V> Display for SpecializationError <T, V>
-where
-	T: TokenizeBinding <V>,
-	T::Error: Display
-{
-	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
-	{
-		match self
-		{
-			Self::Mismatch (e) => Display::fmt (e, f),
+			Self::Lookup (e) => Display::fmt (e, f),
+			Self::LenMismatch (e) => Display::fmt (e, f),
 			Self::Tokenize (e) => Display::fmt (e, f),
 			Self::Parse (e) => Display::fmt (e, f)
 		}
 	}
 }
 
-impl <T, V> Error for SpecializationError <T, V>
-where
-	T: TokenizeBinding <V>,
-	T::Error: Debug + Display
+impl <E> Error for SpecializationError <E>
+where E: Debug + Display
 {
 }
 
-impl <T, V> Into <syn::Error> for SpecializationError <T, V>
-where
-	T: TokenizeBinding <V>,
-	T::Error: Into <syn::Error>
+impl <E> Into <syn::Error> for SpecializationError <E>
+where E: Into <syn::Error>
 {
 	fn into (self) -> syn::Error
 	{
 		match self
 		{
-			Self::Mismatch (e) => e . into (),
+			Self::Lookup (e) => e . into (),
+			Self::LenMismatch (e) => e . into (),
 			Self::Tokenize (e) => e . into (),
 			Self::Parse (e) => e
 		}

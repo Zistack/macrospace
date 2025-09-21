@@ -10,14 +10,17 @@ use quote::ToTokens;
 
 use super::{
 	Parameter,
+	Index,
 	ParameterSchema,
 	StructuredBindingView,
+	IndexBindings,
 	OptionalPattern,
 	ZeroOrMorePattern,
 	OneOrMorePattern,
 	RepetitionPattern,
 	GroupPattern,
 	PatternItem,
+	VisitationError,
 	SpecializationError,
 	PatternVisitor,
 	TokenizeBinding
@@ -64,6 +67,13 @@ impl <T> PatternBuffer <T>
 		self . parameters . insert (parameter . ident . clone ());
 
 		self . pattern_items . push (PatternItem::Parameter (parameter));
+	}
+
+	pub fn append_index (&mut self, index: Index)
+	{
+		self . parameters . insert (index . ident . clone ());
+
+		self . pattern_items . push (PatternItem::Index (index));
 	}
 
 	pub fn append_optional (&mut self, optional: OptionalPattern <T>)
@@ -132,6 +142,7 @@ impl <T> PatternBuffer <T>
 		{
 			PatternItem::Parameter (parameter) =>
 				self . append_parameter (parameter),
+			PatternItem::Index (index) => self . append_index (index),
 			PatternItem::Optional (optional) =>
 				self . append_optional (optional),
 			PatternItem::ZeroOrMore (zero_or_more) =>
@@ -257,12 +268,13 @@ impl <T> PatternBuffer <T>
 		Ok (schema)
 	}
 
-	pub fn visit <V> (&self, visitor: &mut V) -> Result <(), V::Error>
+	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)
+	-> Result <(), VisitationError <V::Error>>
 	where V: PatternVisitor <T>
 	{
 		for pattern_item in &self . pattern_items
 		{
-			pattern_item . visit (visitor)?;
+			pattern_item . visit (index_bindings, visitor)?;
 		}
 
 		Ok (())
@@ -271,15 +283,16 @@ impl <T> PatternBuffer <T>
 	pub fn specialize <'a, V>
 	(
 		&self,
+		index_bindings: &IndexBindings,
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), SpecializationError <T, V>>
+	-> Result <(), SpecializationError <T::Error>>
 	where T: Clone + Parse + TokenizeBinding <V>
 	{
 		for pattern_item in &self . pattern_items
 		{
-			pattern_item . specialize (bindings, pattern_buffer)?;
+			pattern_item . specialize (index_bindings, bindings, pattern_buffer)?;
 		}
 
 		Ok (())

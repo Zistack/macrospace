@@ -2,7 +2,7 @@ use proc_macro2::{Punct, Literal, Delimiter};
 use proc_macro2::extra::DelimSpan;
 use syn::Ident;
 
-use super::Parameter;
+use super::{Parameter, Index, VisitationError};
 
 pub trait PatternVisitor <T>
 {
@@ -16,6 +16,13 @@ pub trait PatternVisitor <T>
 
 	#[allow (unused_variables)]
 	fn visit_parameter (&mut self, parameter: &Parameter <T>)
+	-> Result <(), Self::Error>
+	{
+		Ok (())
+	}
+
+	#[allow (unused_variables)]
+	fn visit_index (&mut self, index: &Index, i: usize)
 	-> Result <(), Self::Error>
 	{
 		Ok (())
@@ -47,6 +54,7 @@ pub trait PatternVisitor <T>
 	(
 		&mut self,
 		repetition_parameters: I,
+		repetition_index_len: Option <(&Ident, usize)>,
 		zero_or_more_visitor: Self::ZeroOrMoreVisitor
 	)
 	-> Result <(), Self::Error>
@@ -64,6 +72,7 @@ pub trait PatternVisitor <T>
 	(
 		&mut self,
 		repetition_parameters: I,
+		repetition_index_len: Option <(&Ident, usize)>,
 		one_or_more_visitor: Self::OneOrMoreVisitor
 	)
 	-> Result <(), Self::Error>
@@ -130,9 +139,9 @@ pub trait OptionalVisitor <T>
 	(
 		&mut self,
 		once_visitor: Self::OnceVisitor,
-		visit_result: Result <(), Self::Error>
+		visit_result: Result <(), VisitationError <Self::Error>>
 	)
-	-> Result <(), Self::Error>
+	-> Result <(), VisitationError <Self::Error>>
 	{
 		Ok (())
 	}
@@ -151,9 +160,9 @@ pub trait ZeroOrMoreVisitor <T>
 	(
 		&mut self,
 		iteration_visitor: Self::IterationVisitor,
-		visit_result: Result <(), Self::Error>
+		visit_result: Result <(), VisitationError <Self::Error>>
 	)
-	-> Result <(), Self::Error>
+	-> Result <(), VisitationError <Self::Error>>
 	{
 		Ok (())
 	}
@@ -178,9 +187,9 @@ pub trait OneOrMoreVisitor <T>
 	(
 		&mut self,
 		iteration_visitor: Self::IterationVisitor,
-		visit_result: Result <(), Self::Error>
+		visit_result: Result <(), VisitationError <Self::Error>>
 	)
-	-> Result <(), Self::Error>
+	-> Result <(), VisitationError <Self::Error>>
 	{
 		Ok (())
 	}

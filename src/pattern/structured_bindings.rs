@@ -9,6 +9,7 @@ use syn::Ident;
 pub enum StructuredBindingType
 {
 	Value,
+	Index,
 	Optional,
 	ZeroOrMore,
 	OneOrMore
@@ -21,6 +22,7 @@ impl Display for StructuredBindingType
 		match self
 		{
 			Self::Value => f . write_str ("value"),
+			Self::Index => f . write_str ("index"),
 			Self::Optional => f . write_str ("optional"),
 			Self::ZeroOrMore => f . write_str ("zero_or_more"),
 			Self::OneOrMore => f . write_str ("one_or_more")
@@ -32,6 +34,7 @@ impl Display for StructuredBindingType
 pub enum StructuredBinding <V>
 {
 	Value (V),
+	Index (usize),
 	Optional (Option <Box <StructuredBinding <V>>>),
 	ZeroOrMore (Vec <StructuredBinding <V>>),
 	OneOrMore (Vec <StructuredBinding <V>>)
@@ -44,6 +47,7 @@ impl <V> StructuredBinding <V>
 		match self
 		{
 			Self::Value (_) => StructuredBindingType::Value,
+			Self::Index (_) => StructuredBindingType::Index,
 			Self::Optional (_) => StructuredBindingType::Optional,
 			Self::ZeroOrMore (_) => StructuredBindingType::ZeroOrMore,
 			Self::OneOrMore (_) => StructuredBindingType::OneOrMore
@@ -58,6 +62,7 @@ impl <V> StructuredBinding <V>
 		match self
 		{
 			Self::Value (v) => StructuredBinding::Value ((f . borrow_mut ()) (v)),
+			Self::Index (len) => StructuredBinding::Index (len),
 			Self::Optional (option) => StructuredBinding::Optional
 			(
 				option . map
@@ -116,6 +121,7 @@ where V: Display
 		match self
 		{
 			Self::Value (v) => Display::fmt (v, f),
+			Self::Index (len) => Display::fmt (len, f),
 			Self::Optional (option) => match option
 			{
 				Some (boxed_binding) => f . write_fmt
@@ -175,6 +181,13 @@ impl <V> StructuredBindings <V>
 	where V: Clone + PartialEq
 	{
 		self . add_binding (ident, StructuredBinding::Value (value))
+	}
+
+	pub fn add_index_len (&mut self, ident: Ident, len: usize)
+	-> Result <(), ParameterBindingMismatch <V>>
+	where V: Clone + PartialEq
+	{
+		self . add_binding (ident, StructuredBinding::Index (len))
 	}
 
 	pub fn add_optional_bindings <'a, I>
@@ -573,6 +586,29 @@ impl <'a, V> StructuredBindingView <'a, V>
 		}
 	}
 
+	pub fn get_index_len (&self, ident: &Ident)
+	-> Result <usize, StructuredBindingLookupError>
+	{
+		match self . map . get (ident)
+		{
+			None => Err
+			(
+				ParameterBindingNotFound::new (ident . clone ()) . into ()
+			),
+			Some (StructuredBinding::Index (len)) => Ok (*len),
+			Some (s) => Err
+			(
+				StructuredBindingTypeMismatch::new
+				(
+					ident . clone (),
+					s . ty (),
+					StructuredBindingType::Index
+				)
+					. into ()
+			)
+		}
+	}
+
 	pub fn project <'b, I> (&self, idents: I)
 	-> Result <Self, ParameterBindingNotFound>
 	where I: IntoIterator <Item = &'b Ident>
@@ -805,4 +841,16 @@ impl Display for StructuredBindingLookupError
 
 impl Error for StructuredBindingLookupError
 {
+}
+
+impl Into <syn::Error> for StructuredBindingLookupError
+{
+	fn into (self) -> syn::Error
+	{
+		match self
+		{
+			Self::TypeMismatch (e) => e . into (),
+			Self::NotFound (e) => e . into ()
+		}
+	}
 }

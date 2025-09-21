@@ -8,6 +8,8 @@ use quote::ToTokens;
 use super::{
 	ParameterSchema,
 	StructuredBindings,
+	IndexBindings,
+	VisitationError,
 	SpecializationError,
 	PatternBuffer,
 	PatternVisitor,
@@ -71,14 +73,16 @@ impl <T> Pattern <T>
 	}
 
 	pub fn visit_pattern <V> (&self, visitor: &mut V)
-	-> Result <(), <V as PatternVisitor <T>>::Error>
+	-> Result <(), VisitationError <<V as PatternVisitor <T>>::Error>>
 	where V: PatternVisitor <T>
 	{
-		self . pattern_buffer . visit (visitor)
+		let index_bindings = IndexBindings::new ();
+
+		self . pattern_buffer . visit (&index_bindings, visitor)
 	}
 
 	pub fn match_input <V> (&self, input: ParseStream <'_>)
-	-> syn::Result <StructuredBindings <V>>
+	-> Result <StructuredBindings <V>, VisitationError <syn::Error>>
 	where
 		T: ParseBinding <V>,
 		V: Clone + PartialEq + Display
@@ -105,7 +109,7 @@ impl <T> Pattern <T>
 	}
 
 	pub fn substitute <V> (&self, bindings: &StructuredBindings <V>)
-	-> Result <TokenStream, SubstitutionError <T, V>>
+	-> Result <TokenStream, VisitationError <SubstitutionError <T::Error>>>
 	where T: TokenizeBinding <V>
 	{
 		let mut substitution_visitor =
@@ -117,14 +121,18 @@ impl <T> Pattern <T>
 	}
 
 	pub fn specialize <V> (&self, bindings: &StructuredBindings <V>)
-	-> Result <Self, SpecializationError <T, V>>
+	-> Result <Self, SpecializationError <T::Error>>
 	where T: Clone + Parse + Debug + TokenizeBinding <V>
 	{
+		let index_bindings = IndexBindings::new ();
 		let mut pattern_buffer = PatternBuffer::new ();
 
-		self
-			. pattern_buffer
-			. specialize (&bindings . view (), &mut pattern_buffer)?;
+		self . pattern_buffer . specialize
+		(
+			&index_bindings,
+			&bindings . view (),
+			&mut pattern_buffer
+		)?;
 
 		// Because repetitions are fully instantiated if all bindings exist, the
 		// only remaining repetitions must yet have unbound parameters, and so

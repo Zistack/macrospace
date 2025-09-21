@@ -8,6 +8,8 @@ use super::{
 	ParameterSchema,
 	NoParameterInRepetition,
 	StructuredBindingView,
+	IndexBindings,
+	VisitationError,
 	SpecializationError,
 	PatternBuffer,
 	PatternVisitor,
@@ -45,22 +47,25 @@ impl <T> GroupPattern <T>
 		self . inner_pattern . extract_schema ()
 	}
 
-	pub fn visit <V> (&self, visitor: &mut V) -> Result <(), V::Error>
+	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)
+	-> Result <(), VisitationError <V::Error>>
 	where V: PatternVisitor <T>
 	{
 		let mut group_visitor = visitor . pre_visit_group
 		(
 			self . delimiter,
 			self . delim_span
-		)?;
+		)
+			. map_err (VisitationError::Visitor)?;
 
-		self . inner_pattern . visit (&mut group_visitor)?;
+		self . inner_pattern . visit (index_bindings, &mut group_visitor)?;
 
 		visitor . post_visit_group
 		(
 			self . delimiter,
 			self . delim_span, group_visitor
-		)?;
+		)
+			. map_err (VisitationError::Visitor)?;
 
 		Ok (())
 	}
@@ -68,17 +73,18 @@ impl <T> GroupPattern <T>
 	pub fn specialize <'a, V>
 	(
 		&self,
+		index_bindings: &IndexBindings,
 		bindings: &StructuredBindingView <'a, V>,
 		pattern_buffer: &mut PatternBuffer <T>
 	)
-	-> Result <(), SpecializationError <T, V>>
+	-> Result <(), SpecializationError <T::Error>>
 	where T: Clone + Parse + TokenizeBinding <V>
 	{
 		let delimiter = self . delimiter;
 		let delim_span = self . delim_span;
 		let mut inner_pattern = PatternBuffer::new ();
 
-		self . inner_pattern . specialize (bindings, &mut inner_pattern)?;
+		self . inner_pattern . specialize (index_bindings, bindings, &mut inner_pattern)?;
 
 		pattern_buffer . append_group
 		(

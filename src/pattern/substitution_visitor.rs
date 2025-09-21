@@ -8,14 +8,17 @@ use quote::{ToTokens, TokenStreamExt};
 
 use super::{
 	Parameter,
+	Index,
 	StructuredBindingView,
 	StructuredBindingLookupError,
 	StructuredBindingTypeMismatch,
 	ParameterBindingNotFound,
+	VisitationError,
 	PatternVisitor,
 	OptionalVisitor,
 	ZeroOrMoreVisitor,
 	OneOrMoreVisitor,
+	RepetitionLenMismatch,
 	TokenizeBinding
 };
 
@@ -41,7 +44,7 @@ impl <'a, V> SubstitutionVisitor <'a, V>
 impl <'a, V, T> PatternVisitor <T> for SubstitutionVisitor <'a, V>
 where T: TokenizeBinding <V>
 {
-	type Error = SubstitutionError <T, V>;
+	type Error = SubstitutionError <T::Error>;
 	type OptionalVisitor = SubstitutionOptionalVisitor <'a, V>;
 	type ZeroOrMoreVisitor = SubstitutionXOrMoreVisitor <'a, V>;
 	type OneOrMoreVisitor = SubstitutionXOrMoreVisitor <'a, V>;
@@ -56,6 +59,14 @@ where T: TokenizeBinding <V>
 			. extra_tokens
 			. tokenize (&parameter . ident, value, &mut self . tokens)
 			. map_err (SubstitutionError::Tokenize)?;
+
+		Ok (())
+	}
+
+	fn visit_index (&mut self, _index: &Index, i: usize)
+	-> Result <(), Self::Error>
+	{
+		self . tokens . append (Literal::usize_unsuffixed (i));
 
 		Ok (())
 	}
@@ -104,11 +115,31 @@ where T: TokenizeBinding <V>
 	(
 		&mut self,
 		_repetition_parameters: I,
+		repetition_index_len: Option <(&Ident, usize)>,
 		zero_or_more_visitor: Self::ZeroOrMoreVisitor
 	)
 	-> Result <(), Self::Error>
 	where I: IntoIterator <Item = &'b Ident>
 	{
+		if let Some ((index_ident, len)) = repetition_index_len
+		{
+			let expected_len = self . bindings . get_index_len (index_ident)?;
+
+			if len != expected_len
+			{
+				return Err
+				(
+					RepetitionLenMismatch::new
+					(
+						index_ident . clone (),
+						len,
+						expected_len
+					)
+						. into ()
+				);
+			}
+		}
+
 		self . tokens . extend (zero_or_more_visitor . tokens);
 
 		Ok (())
@@ -131,11 +162,31 @@ where T: TokenizeBinding <V>
 	(
 		&mut self,
 		_repetition_parameters: I,
+		repetition_index_len: Option <(&Ident, usize)>,
 		one_or_more_visitor: Self::OneOrMoreVisitor
 	)
 	-> Result <(), Self::Error>
 	where I: IntoIterator <Item = &'b Ident>
 	{
+		if let Some ((index_ident, len)) = repetition_index_len
+		{
+			let expected_len = self . bindings . get_index_len (index_ident)?;
+
+			if len != expected_len
+			{
+				return Err
+				(
+					RepetitionLenMismatch::new
+					(
+						index_ident . clone (),
+						len,
+						expected_len
+					)
+						. into ()
+				);
+			}
+		}
+
 		self . tokens . extend (one_or_more_visitor . tokens);
 
 		Ok (())
@@ -205,7 +256,7 @@ impl <'a, V> SubstitutionOptionalVisitor <'a, V>
 impl <'a, V, T> OptionalVisitor <T> for SubstitutionOptionalVisitor <'a, V>
 where T: TokenizeBinding <V>
 {
-	type Error = SubstitutionError <T, V>;
+	type Error = SubstitutionError <T::Error>;
 	type OnceVisitor = SubstitutionVisitor <'a, V>;
 
 	fn pre_visit_once (&mut self)
@@ -224,9 +275,9 @@ where T: TokenizeBinding <V>
 	(
 		&mut self,
 		once_visitor: Self::OnceVisitor,
-		visit_result: Result <(), Self::Error>
+		visit_result: Result <(), VisitationError <Self::Error>>
 	)
-	-> Result <(), Self::Error>
+	-> Result <(), VisitationError <Self::Error>>
 	{
 		visit_result?;
 
@@ -254,7 +305,7 @@ impl <'a, V> SubstitutionXOrMoreVisitor <'a, V>
 impl <'a, V, T> ZeroOrMoreVisitor <T> for SubstitutionXOrMoreVisitor <'a, V>
 where T: TokenizeBinding <V>
 {
-	type Error = SubstitutionError <T, V>;
+	type Error = SubstitutionError <T::Error>;
 	type IterationVisitor = SubstitutionVisitor <'a, V>;
 
 	fn pre_visit_iteration (&mut self)
@@ -273,9 +324,9 @@ where T: TokenizeBinding <V>
 	(
 		&mut self,
 		iteration_visitor: Self::IterationVisitor,
-		visit_result: Result <(), Self::Error>
+		visit_result: Result <(), VisitationError <Self::Error>>
 	)
-	-> Result <(), Self::Error>
+	-> Result <(), VisitationError <Self::Error>>
 	{
 		visit_result?;
 
@@ -308,7 +359,7 @@ where T: TokenizeBinding <V>
 impl <'a, V, T> OneOrMoreVisitor <T> for SubstitutionXOrMoreVisitor <'a, V>
 where T: TokenizeBinding <V>
 {
-	type Error = SubstitutionError <T, V>;
+	type Error = SubstitutionError <T::Error>;
 	type IterationVisitor = SubstitutionVisitor <'a, V>;
 
 	fn pre_visit_first (&mut self)
@@ -341,9 +392,9 @@ where T: TokenizeBinding <V>
 	(
 		&mut self,
 		iteration_visitor: Self::IterationVisitor,
-		visit_result: Result <(), Self::Error>
+		visit_result: Result <(), VisitationError <Self::Error>>
 	)
-	-> Result <(), Self::Error>
+	-> Result <(), VisitationError <Self::Error>>
 	{
 		visit_result?;
 
@@ -373,30 +424,15 @@ where T: TokenizeBinding <V>
 	}
 }
 
-pub enum SubstitutionError <T, V>
-where T: TokenizeBinding <V>
+#[derive (Clone, Debug)]
+pub enum SubstitutionError <E>
 {
 	Lookup (StructuredBindingLookupError),
-	Tokenize (T::Error)
+	LenMismatch (RepetitionLenMismatch),
+	Tokenize (E),
 }
 
-impl <T, V> Clone for SubstitutionError <T, V>
-where
-	T: TokenizeBinding <V>,
-	T::Error: Clone
-{
-	fn clone (&self) -> Self
-	{
-		match self
-		{
-			Self::Lookup (e) => Self::Lookup (e . clone ()),
-			Self::Tokenize (e) => Self::Tokenize (e . clone ())
-		}
-	}
-}
-
-impl <T, V> From <StructuredBindingLookupError> for SubstitutionError <T, V>
-where T: TokenizeBinding <V>
+impl <E> From <StructuredBindingLookupError> for SubstitutionError <E>
 {
 	fn from (e: StructuredBindingLookupError) -> Self
 	{
@@ -404,8 +440,7 @@ where T: TokenizeBinding <V>
 	}
 }
 
-impl <T, V> From <StructuredBindingTypeMismatch> for SubstitutionError <T, V>
-where T: TokenizeBinding <V>
+impl <E> From <StructuredBindingTypeMismatch> for SubstitutionError <E>
 {
 	fn from (e: StructuredBindingTypeMismatch) -> Self
 	{
@@ -413,8 +448,7 @@ where T: TokenizeBinding <V>
 	}
 }
 
-impl <T, V> From <ParameterBindingNotFound> for SubstitutionError <T, V>
-where T: TokenizeBinding <V>
+impl <E> From <ParameterBindingNotFound> for SubstitutionError <E>
 {
 	fn from (e: ParameterBindingNotFound) -> Self
 	{
@@ -422,59 +456,43 @@ where T: TokenizeBinding <V>
 	}
 }
 
-impl <T, V> Debug for SubstitutionError <T, V>
-where
-	T: TokenizeBinding <V>,
-	T::Error: Debug
+impl <E> From <RepetitionLenMismatch> for SubstitutionError <E>
 {
-	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	fn from (e: RepetitionLenMismatch) -> Self
 	{
-		match self
-		{
-			Self::Lookup (e) =>
-				f . debug_tuple ("Lookup") . field (e) . finish (),
-			Self::Tokenize (e) =>
-				f . debug_tuple ("Tokenize") . field (e) . finish ()
-		}
+		Self::LenMismatch (e)
 	}
 }
 
-impl <T, V> Display for SubstitutionError <T, V>
-where
-	T: TokenizeBinding <V>,
-	T::Error: Display
+impl <E> Display for SubstitutionError <E>
+where E: Display
 {
 	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
 	{
 		match self
 		{
 			Self::Lookup (e) => Display::fmt (e, f),
+			Self::LenMismatch (e) => Display::fmt (e, f),
 			Self::Tokenize (e) => Display::fmt (e, f)
 		}
 	}
 }
 
-impl <T, V> Error for SubstitutionError <T, V>
-where
-	T: TokenizeBinding <V>,
-	T::Error: Debug + Display
+impl <E> Error for SubstitutionError <E>
+where E: Debug + Display
 {
 }
 
-/*
-// I think?
-impl <T, V> Into <syn::Error> for SubstitutionError <T, V>
-where
-	T: TokenizeBinding <V>,
-	T::Error: Into <syn::Error>
+impl <E> Into <syn::Error> for SubstitutionError <E>
+where E: Into <syn::Error>
 {
 	fn into (self) -> syn::Error
 	{
 		match self
 		{
 			Self::Lookup (e) => e . into (),
+			Self::LenMismatch (e) => e . into (),
 			Self::Tokenize (e) => e . into ()
 		}
 	}
 }
-*/
