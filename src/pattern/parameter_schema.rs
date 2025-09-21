@@ -8,6 +8,7 @@ use syn::Ident;
 pub struct ParameterSchema
 {
 	pub parameters: HashSet <Ident>,
+	pub index_parameter: Option <Ident>,
 	pub optional_parameters: Option <Box <ParameterSchema>>,
 	pub zero_or_more_parameters: Option <Box <ParameterSchema>>,
 	pub one_or_more_parameters: Option <Box <ParameterSchema>>
@@ -20,6 +21,7 @@ impl ParameterSchema
 		Self
 		{
 			parameters: HashSet::new (),
+			index_parameter: None,
 			optional_parameters: None,
 			zero_or_more_parameters: None,
 			one_or_more_parameters: None
@@ -29,6 +31,11 @@ impl ParameterSchema
 	pub fn add_parameter (&mut self, ident: Ident)
 	{
 		self . parameters . insert (ident);
+	}
+
+	pub fn add_index_parameter (&mut self, ident: Ident)
+	{
+		self . index_parameter = Some (ident);
 	}
 
 	fn merge_nested_parameters
@@ -85,6 +92,7 @@ impl ParameterSchema
 	pub fn is_empty (&self) -> bool
 	{
 		self . parameters . is_empty ()
+			&& self . index_parameter . is_none ()
 			&& Self::nested_parameters_are_empty (&self . optional_parameters)
 			&& Self::nested_parameters_are_empty (&self . zero_or_more_parameters)
 			&& Self::nested_parameters_are_empty (&self . one_or_more_parameters)
@@ -120,6 +128,22 @@ impl ParameterSchema
 	-> Result <HashSet <Ident>, ParameterUsedInIncompatibleRepetitions>
 	{
 		let mut disjoint_parameters = self . parameters . clone ();
+
+		if let Some (index_parameter) = &self . index_parameter
+		{
+			if disjoint_parameters . contains (index_parameter)
+			{
+				return Err
+				(
+					ParameterUsedInIncompatibleRepetitions::new
+					(
+						index_parameter . clone ()
+					)
+				);
+			}
+
+			disjoint_parameters . insert (index_parameter . clone ());
+		}
 
 		if let Some (optional_parameters) =
 			Self::assert_nested_parameters_disjoint (&self . optional_parameters)?
@@ -160,6 +184,10 @@ impl ParameterSchema
 		if ! self . parameters . is_empty ()
 		{
 			Some (self . parameters . iter () . next () . unwrap ())
+		}
+		else if let Some (ident) = &self . index_parameter
+		{
+			Some (ident)
 		}
 		else if let Some (ident) =
 			Self::nested_get_any_ident (&self . optional_parameters)

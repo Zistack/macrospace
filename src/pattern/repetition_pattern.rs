@@ -242,7 +242,14 @@ impl <T> ZeroOrMorePattern <T>
 	-> Result <ParameterSchema, NoParameterInRepetition <T>>
 	where T: Clone
 	{
-		self . inner_pattern . extract_schema ()
+		let mut schema = self . inner_pattern . extract_schema ()?;
+
+		if let Some (repetition_index) = &self . repetition_index
+		{
+			schema . add_index_parameter (repetition_index . ident . clone ());
+		}
+
+		Ok (schema)
 	}
 
 	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)
@@ -485,7 +492,14 @@ impl <T> OneOrMorePattern <T>
 	-> Result <ParameterSchema, NoParameterInRepetition <T>>
 	where T: Clone
 	{
-		self . inner_pattern . extract_schema ()
+		let mut schema = self . inner_pattern . extract_schema ()?;
+
+		if let Some (repetition_index) = &self . repetition_index
+		{
+			schema . add_index_parameter (repetition_index . ident . clone ());
+		}
+
+		Ok (schema)
 	}
 
 	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)
