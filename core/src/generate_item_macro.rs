@@ -1,7 +1,7 @@
 use syn::{Attribute, Visibility, Ident, parse_quote};
 use quote::{ToTokens, quote, format_ident};
 
-use crate::get_macro_ident;
+use crate::{get_macro_ident, sanitize};
 
 pub fn generate_item_macro <T>
 (
@@ -22,6 +22,8 @@ where T: ToTokens
 		Visibility::Public (_) => Some (parse_quote! (#[macro_export])),
 		_ => None
 	};
+
+	let sanitized_item = sanitize (item);
 
 	quote!
 	{
@@ -49,7 +51,7 @@ where T: ToTokens
 							$next_item_path: $($next_item_types)|*
 							($($item_args)*)
 							$inner_macro_path
-							{$($items)* #item}
+							{$($items)* #sanitized_item}
 							[$($tokens)*]
 						);
 					}
@@ -74,7 +76,7 @@ where T: ToTokens
 							$next_item_path: $($next_item_types)|*
 							()
 							$inner_macro_path
-							{$($items)* #item}
+							{$($items)* #sanitized_item}
 							[$($tokens)*]
 						);
 					}
@@ -91,7 +93,7 @@ where T: ToTokens
 				macrospace::check_item_type!
 				(
 					$this_item_path: #item_type == $($this_item_types)|*
-					{$inner_macro_path! ({$($items)* #item} [$($tokens)*]);}
+					{$inner_macro_path! ({$($items)* #sanitized_item} [$($tokens)*]);}
 				);
 			}
 		}

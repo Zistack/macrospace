@@ -1,8 +1,7 @@
 use syn::Path;
 use quote::{ToTokens, quote};
 
-use crate::get_macro_path;
-use crate::ItemArgument;
+use crate::{ItemArgument, get_macro_path, sanitize};
 
 pub fn generate_macrospace_invokation <I, T>
 (
@@ -27,6 +26,8 @@ where
 	let mut item_paths = item_paths . into_iter ();
 	let mut item_type_specs = item_type_specs . into_iter ();
 
+	let sanitized_additional_tokens = sanitize (additional_tokens);
+
 	if let (Some (first_item), Some (first_type_spec))
 		= (item_paths . next (), item_type_specs . next ())
 	{
@@ -40,7 +41,7 @@ where
 				(#(#item_paths: #item_type_specs),*)
 				#inner_macro_path
 				{}
-				[#additional_tokens]
+				[#sanitized_additional_tokens]
 			);
 		}
 	}
@@ -48,7 +49,7 @@ where
 	{
 		quote!
 		{
-			#inner_macro_path! ({} [#additional_tokens]);
+			#inner_macro_path! ({} [#sanitized_additional_tokens]);
 		}
 	}
 }

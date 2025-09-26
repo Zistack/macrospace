@@ -1,3 +1,6 @@
+mod sanitize;
+use sanitize::*;
+
 mod item_type_spec;
 pub use item_type_spec::{ItemTypeSpec, ItemTypeMismatch};
 

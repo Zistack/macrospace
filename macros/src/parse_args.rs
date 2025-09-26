@@ -15,7 +15,7 @@ fn parse_args (n: Index, input: Expr) -> proc_macro2::TokenStream
 			{
 				use syn::parse::Parser;
 
-				let macrospace::MultiItemMacroInput {items, user_data, ..}
+				let macrospace::MultiItemMacroInput {items_tokens, user_data, ..}
 					= syn::parse (input)?;
 
 				let parse_items = |input: syn::parse::ParseStream <'_>|
@@ -25,7 +25,7 @@ fn parse_args (n: Index, input: Expr) -> proc_macro2::TokenStream
 					syn::Result::Ok ((#(#item_var_names),*))
 				};
 
-				syn::Result::Ok ((parse_items . parse2 (items)?, user_data))
+				syn::Result::Ok ((parse_items . parse2 (items_tokens)?, user_data))
 			}
 		)
 		(#input)
