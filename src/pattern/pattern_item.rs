@@ -18,6 +18,7 @@ use super::{
 	ZeroOrMorePattern,
 	OneOrMorePattern,
 	RepetitionPattern,
+	NoParameterInRepetition,
 	RepetitionLenMismatch,
 	GroupPattern,
 	PatternBuffer,
@@ -96,6 +97,19 @@ where T: Parse
 
 impl <T> PatternItem <T>
 {
+	pub fn validate (&self) -> Result <(), NoParameterInRepetition <T>>
+	where T: Clone
+	{
+		match self
+		{
+			Self::Optional (optional) => optional . validate (),
+			Self::ZeroOrMore (zero_or_more) => zero_or_more . validate (),
+			Self::OneOrMore (one_or_more) => one_or_more . validate (),
+			Self::Group (group) => group . validate (),
+			_ => Ok (())
+		}
+	}
+
 	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)
 	-> Result <(), VisitationError <V::Error>>
 	where V: PatternVisitor <T>

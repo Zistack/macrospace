@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
 
 use proc_macro2::TokenStream;
@@ -6,7 +7,6 @@ use syn::parse::{Parse, ParseStream, Parser};
 use quote::ToTokens;
 
 use super::{
-	ParameterSchema,
 	StructuredBindings,
 	IndexBindings,
 	VisitationError,
@@ -24,7 +24,7 @@ use super::{
 pub struct Pattern <T>
 {
 	pattern_buffer: PatternBuffer <T>,
-	parameter_schema: ParameterSchema
+	parameters: HashSet <Ident>
 }
 
 impl <T> Parse for Pattern <T>
@@ -34,15 +34,14 @@ where T: Clone + Parse + ToTokens
 	{
 		let pattern_buffer: PatternBuffer <T> = input . parse ()?;
 
-		let parameter_schema = pattern_buffer
-			. extract_schema ()
-			. map_err (Into::<syn::Error>::into)?;
+		pattern_buffer . validate () . map_err (Into::<syn::Error>::into)?;
 
-		parameter_schema
-			. assert_parameters_disjoint ()
-			. map_err (Into::<syn::Error>::into)?;
+		let parameters = pattern_buffer
+			. referenced_identifiers ()
+			. cloned ()
+			. collect ();
 
-		Ok (Self {pattern_buffer, parameter_schema})
+		Ok (Self {pattern_buffer, parameters})
 	}
 }
 
@@ -66,10 +65,18 @@ where T: ToTokens
 
 impl <T> Pattern <T>
 {
-	pub fn assert_parameters_superschema <O> (&self, other: &Pattern <O>)
+	pub fn assert_parameters_superset <O> (&self, other: &Pattern <O>)
 	-> Result <(), Ident>
 	{
-		self . parameter_schema . assert_superschema (&other . parameter_schema)
+		for ident in &other . parameters
+		{
+			if ! self . parameters . contains (ident)
+			{
+				return Err (ident . clone ())
+			}
+		}
+
+		Ok (())
 	}
 
 	pub fn visit_pattern <V> (&self, visitor: &mut V)
@@ -134,11 +141,14 @@ impl <T> Pattern <T>
 			&mut pattern_buffer
 		)?;
 
-		// Because repetitions are fully instantiated if all bindings exist, the
-		// only remaining repetitions must yet have unbound parameters, and so
-		// this schema extraction will never return an error.
-		let parameter_schema = pattern_buffer . extract_schema () . unwrap ();
+		// No validation required.  A valid pattern, when specialized, will
+		// always produce a valid pattern.
 
-		Ok (Self {pattern_buffer, parameter_schema})
+		let parameters = pattern_buffer
+			. referenced_identifiers ()
+			. cloned ()
+			. collect ();
+
+		Ok (Self {pattern_buffer, parameters})
 	}
 }

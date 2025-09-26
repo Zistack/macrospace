@@ -22,7 +22,7 @@ use super::{
 	TokenizeBinding
 };
 
-pub struct SubstitutionVisitor <'a, V>
+pub (in crate::pattern) struct SubstitutionVisitor <'a, V>
 {
 	bindings: StructuredBindingView <'a, V>,
 	tokens: TokenStream
@@ -239,7 +239,7 @@ where T: TokenizeBinding <V>
 	}
 }
 
-pub struct SubstitutionOptionalVisitor <'a, V>
+pub (in crate::pattern) struct SubstitutionOptionalVisitor <'a, V>
 {
 	bindings: StructuredBindingView <'a, V>,
 	tokens: TokenStream
@@ -287,7 +287,7 @@ where T: TokenizeBinding <V>
 	}
 }
 
-pub struct SubstitutionXOrMoreVisitor <'a, V>
+pub (in crate::pattern) struct SubstitutionXOrMoreVisitor <'a, V>
 {
 	bindings: StructuredBindingView <'a, V>,
 	repetition_index: usize,

@@ -61,6 +61,13 @@ impl ParameterSchema
 			self . parameters . insert (other_parameter);
 		}
 
+		// This assumes that the index parameters would be the same if they were
+		// both Some.
+		if other . index_parameter . is_some ()
+		{
+			self . index_parameter = other . index_parameter;
+		}
+
 		Self::merge_nested_parameters
 		(
 			&mut self . optional_parameters,

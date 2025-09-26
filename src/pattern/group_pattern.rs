@@ -5,7 +5,6 @@ use syn::parse::{Parse, ParseStream};
 use quote::{ToTokens, TokenStreamExt};
 
 use super::{
-	ParameterSchema,
 	NoParameterInRepetition,
 	StructuredBindingView,
 	IndexBindings,
@@ -40,11 +39,10 @@ impl <T> GroupPattern <T>
 		self . inner_pattern . referenced_identifiers ()
 	}
 
-	pub fn extract_schema (&self)
-	-> Result <ParameterSchema, NoParameterInRepetition <T>>
+	pub fn validate (&self) -> Result <(), NoParameterInRepetition <T>>
 	where T: Clone
 	{
-		self . inner_pattern . extract_schema ()
+		self . inner_pattern . validate ()
 	}
 
 	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)

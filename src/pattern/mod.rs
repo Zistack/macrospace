@@ -4,9 +4,6 @@ pub use parameter::*;
 mod index;
 pub use index::*;
 
-mod parameter_schema;
-use parameter_schema::*;
-
 mod structured_bindings;
 pub use structured_bindings::*;
 
@@ -16,13 +13,13 @@ use index_bindings::*;
 
 
 mod repetition_pattern;
-use repetition_pattern::*;
+pub use repetition_pattern::*;
 
 mod group_pattern;
 use group_pattern::*;
 
 mod pattern_item;
-use pattern_item::*;
+pub use pattern_item::*;
 
 mod pattern_buffer;
 pub use pattern_buffer::*;
@@ -44,7 +41,7 @@ mod tokenize_binding;
 pub use tokenize_binding::*;
 
 mod substitution_visitor;
-use substitution_visitor::*;
+pub use substitution_visitor::*;
 
 
 

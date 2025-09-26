@@ -378,6 +378,39 @@ impl <V> StructuredBindings <V>
 	}
 }
 
+impl <V> IntoIterator for StructuredBindings <V>
+{
+	type Item = (Ident, StructuredBinding <V>);
+	type IntoIter = <HashMap <Ident, StructuredBinding <V>> as IntoIterator>::IntoIter;
+
+	fn into_iter (self) -> Self::IntoIter
+	{
+		self . map . into_iter ()
+	}
+}
+
+impl <'a, V> IntoIterator for &'a StructuredBindings <V>
+{
+	type Item = (&'a Ident, &'a StructuredBinding <V>);
+	type IntoIter = <&'a HashMap <Ident, StructuredBinding <V>> as IntoIterator>::IntoIter;
+
+	fn into_iter (self) -> Self::IntoIter
+	{
+		(&self . map) . into_iter ()
+	}
+}
+
+impl <'a, V> IntoIterator for &'a mut StructuredBindings <V>
+{
+	type Item = (&'a Ident, &'a mut StructuredBinding <V>);
+	type IntoIter = <&'a mut HashMap <Ident, StructuredBinding <V>> as IntoIterator>::IntoIter;
+
+	fn into_iter (self) -> Self::IntoIter
+	{
+		(&mut self . map) . into_iter ()
+	}
+}
+
 #[derive (Clone, Debug)]
 pub struct ParameterBindingMismatch <V>
 {
@@ -669,9 +702,13 @@ impl <'a, V> StructuredBindingView <'a, V>
 				StructuredBinding::ZeroOrMore (binding_vec) =>
 					match binding_vec . get (index)
 				{
-					Some (binding) => map . insert (ident . clone (), binding),
+					Some (binding) =>
+					{
+						map . insert (ident . clone (), binding);
+					},
 					None => return Ok (None)
 				},
+				StructuredBinding::Index (_) => {},
 				_ => return Err
 				(
 					StructuredBindingTypeMismatch::new
@@ -699,13 +736,17 @@ impl <'a, V> StructuredBindingView <'a, V>
 				StructuredBinding::OneOrMore (binding_vec) =>
 					match binding_vec . get (0)
 				{
-					Some (binding) => map . insert (ident . clone (), binding),
+					Some (binding) =>
+					{
+						map . insert (ident . clone (), binding);
+					},
 					None => return Err
 					(
 						ParameterBindingNotFound::new (ident . clone ())
 							. into ()
 					)
 				},
+				StructuredBinding::Index (_) => {},
 				_ => return Err
 				(
 					StructuredBindingTypeMismatch::new

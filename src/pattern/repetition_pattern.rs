@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 use proc_macro2::{TokenStream, Punct};
 use syn::{Ident, Token, parenthesized};
@@ -8,8 +8,6 @@ use syn_derive::{Parse, ToTokens};
 use quote::ToTokens;
 
 use super::{
-	ParameterSchema,
-	NoParameterInRepetition,
 	StructuredBindingView,
 	IndexBindings,
 	VisitationError,
@@ -72,11 +70,34 @@ impl <T> OptionalPattern <T>
 		self . inner_pattern . referenced_identifiers ()
 	}
 
-	pub fn extract_schema (&self)
-	-> Result <ParameterSchema, NoParameterInRepetition <T>>
+	pub fn assert_has_parameters (&self)
+	-> Result <(), NoParameterInRepetition <T>>
 	where T: Clone
 	{
-		self . inner_pattern . extract_schema ()
+		if ! self . referenced_identifiers () . next () . is_some ()
+		{
+			Err
+			(
+				NoParameterInRepetition::new
+				(
+					RepetitionPattern::Optional (self . clone ())
+				)
+			)
+		}
+		else
+		{
+			Ok (())
+		}
+	}
+
+	pub fn validate (&self) -> Result <(), NoParameterInRepetition <T>>
+	where T: Clone
+	{
+		self . inner_pattern . validate ()?;
+
+		self . assert_has_parameters ()?;
+
+		Ok (())
 	}
 
 	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)
@@ -238,18 +259,35 @@ impl <T> ZeroOrMorePattern <T>
 		)
 	}
 
-	pub fn extract_schema (&self)
-	-> Result <ParameterSchema, NoParameterInRepetition <T>>
+	pub fn assert_has_parameters (&self)
+	-> Result <(), NoParameterInRepetition <T>>
 	where T: Clone
 	{
-		let mut schema = self . inner_pattern . extract_schema ()?;
-
-		if let Some (repetition_index) = &self . repetition_index
+		if ! self . referenced_identifiers () . next () . is_some ()
+			&& ! self . repetition_index . is_some ()
 		{
-			schema . add_index_parameter (repetition_index . ident . clone ());
+			Err
+			(
+				NoParameterInRepetition::new
+				(
+					RepetitionPattern::ZeroOrMore (self . clone ())
+				)
+			)
 		}
+		else
+		{
+			Ok (())
+		}
+	}
 
-		Ok (schema)
+	pub fn validate (&self) -> Result <(), NoParameterInRepetition <T>>
+	where T: Clone
+	{
+		self . inner_pattern . validate ()?;
+
+		self . assert_has_parameters ()?;
+
+		Ok (())
 	}
 
 	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)
@@ -282,7 +320,7 @@ impl <T> ZeroOrMorePattern <T>
 			let visit_result = self
 				. inner_pattern
 				. visit (index_bindings, &mut iteration_visitor);
-			let should_break = visit_result . is_ok ();
+			let should_break = visit_result . is_err ();
 
 			zero_or_more_visitor
 				. post_visit_iteration (iteration_visitor, visit_result)?;
@@ -488,18 +526,35 @@ impl <T> OneOrMorePattern <T>
 		)
 	}
 
-	pub fn extract_schema (&self)
-	-> Result <ParameterSchema, NoParameterInRepetition <T>>
+	pub fn assert_has_parameters (&self)
+	-> Result <(), NoParameterInRepetition <T>>
 	where T: Clone
 	{
-		let mut schema = self . inner_pattern . extract_schema ()?;
-
-		if let Some (repetition_index) = &self . repetition_index
+		if ! self . referenced_identifiers () . next () . is_some ()
+			&& ! self . repetition_index . is_some ()
 		{
-			schema . add_index_parameter (repetition_index . ident . clone ());
+			Err
+			(
+				NoParameterInRepetition::new
+				(
+					RepetitionPattern::OneOrMore (self . clone ())
+				)
+			)
 		}
+		else
+		{
+			Ok (())
+		}
+	}
 
-		Ok (schema)
+	pub fn validate (&self) -> Result <(), NoParameterInRepetition <T>>
+	where T: Clone
+	{
+		self . inner_pattern . validate ()?;
+
+		self . assert_has_parameters ()?;
+
+		Ok (())
 	}
 
 	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)
@@ -573,7 +628,7 @@ impl <T> OneOrMorePattern <T>
 			let visit_result = self
 				. inner_pattern
 				. visit (index_bindings, &mut iteration_visitor);
-			let should_break = visit_result . is_ok ();
+			let should_break = visit_result . is_err ();
 
 			one_or_more_visitor
 				. post_visit_iteration (iteration_visitor, visit_result)?;
@@ -750,7 +805,6 @@ where T: Parse
 
 		let content;
 		let paren_token = parenthesized! (content in input);
-
 		let inner_pattern = content . parse ()?;
 
 		let punct: Punct = input . parse ()?;
@@ -881,6 +935,42 @@ where T: ToTokens
 			Self::ZeroOrMore (zero_or_more) => zero_or_more . to_tokens (tokens),
 			Self::OneOrMore (one_or_more) => one_or_more . to_tokens (tokens)
 		}
+	}
+}
+
+#[derive (Clone, Debug)]
+pub struct NoParameterInRepetition <T>
+{
+	repetition: RepetitionPattern <T>
+}
+
+impl <T> NoParameterInRepetition <T>
+{
+	pub fn new (repetition: RepetitionPattern <T>) -> Self
+	{
+		Self {repetition}
+	}
+}
+
+impl <T> Display for NoParameterInRepetition <T>
+{
+	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
+	{
+		f . write_str ("No parameter in repetition")
+	}
+}
+
+impl <T> Error for NoParameterInRepetition <T>
+where T: Debug
+{
+}
+
+impl <T> Into <syn::Error> for NoParameterInRepetition <T>
+where T: ToTokens
+{
+	fn into (self) -> syn::Error
+	{
+		syn::Error::new_spanned (&self . repetition, &self)
 	}
 }
 

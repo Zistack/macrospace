@@ -1,6 +1,4 @@
 use std::collections::HashSet;
-use std::error::Error;
-use std::fmt::{Debug, Display, Formatter};
 
 use itertools::Itertools;
 use proc_macro2::{TokenStream, Punct, Literal};
@@ -11,13 +9,13 @@ use quote::ToTokens;
 use super::{
 	Parameter,
 	Index,
-	ParameterSchema,
 	StructuredBindingView,
 	IndexBindings,
 	OptionalPattern,
 	ZeroOrMorePattern,
 	OneOrMorePattern,
 	RepetitionPattern,
+	NoParameterInRepetition,
 	GroupPattern,
 	PatternItem,
 	VisitationError,
@@ -185,87 +183,15 @@ impl <T> PatternBuffer <T>
 			. unique ()
 	}
 
-	fn assert_nested_schema_nonempty <R>
-	(
-		nested_schema: &ParameterSchema,
-		repetition: &R
-	)
-	-> Result <(), NoParameterInRepetition <T>>
-	where R: Clone + Into <RepetitionPattern <T>>
-	{
-		match nested_schema . is_empty ()
-		{
-			true => Err
-			(
-				NoParameterInRepetition::new (repetition . clone () . into ())
-			),
-			false => Ok (())
-		}
-	}
-
-	pub fn extract_schema (&self)
-	-> Result <ParameterSchema, NoParameterInRepetition <T>>
+	pub fn validate (&self) -> Result <(), NoParameterInRepetition <T>>
 	where T: Clone
 	{
-		let mut schema = ParameterSchema::new ();
-
-		for ident in self . referenced_identifiers ()
+		for pattern_item in &self . pattern_items
 		{
-			schema . add_parameter (ident . clone ());
+			pattern_item . validate ()?;
 		}
 
-		let mut optional_schema = ParameterSchema::new ();
-		let mut zero_or_more_schema = ParameterSchema::new ();
-		let mut one_or_more_schema = ParameterSchema::new ();
-
-		for sub_pattern_item
-		in self
-			. sub_pattern_indices
-			. iter ()
-			. map (|i| &self . pattern_items [*i])
-		{
-			match sub_pattern_item
-			{
-				PatternItem::Optional (optional) =>
-				{
-					let nested_schema = optional . extract_schema ()?;
-					Self::assert_nested_schema_nonempty (&nested_schema, optional)?;
-					optional_schema . merge (nested_schema);
-				},
-				PatternItem::ZeroOrMore (zero_or_more) =>
-				{
-					let nested_schema = zero_or_more . extract_schema ()?;
-					Self::assert_nested_schema_nonempty (&nested_schema, zero_or_more)?;
-					zero_or_more_schema . merge (nested_schema);
-				},
-				PatternItem::OneOrMore (one_or_more) =>
-				{
-					let nested_schema = one_or_more . extract_schema ()?;
-					Self::assert_nested_schema_nonempty (&nested_schema, one_or_more)?;
-					one_or_more_schema . merge (nested_schema);
-				},
-				PatternItem::Group (group) =>
-					schema . merge (group . extract_schema ()?),
-				_ => unreachable! ()
-			}
-		}
-
-		if ! optional_schema . is_empty ()
-		{
-			schema . optional_parameters = Some (Box::new (optional_schema));
-		}
-
-		if ! zero_or_more_schema . is_empty ()
-		{
-			schema . zero_or_more_parameters = Some (Box::new (zero_or_more_schema));
-		}
-
-		if ! one_or_more_schema . is_empty ()
-		{
-			schema . one_or_more_parameters = Some (Box::new (one_or_more_schema));
-		}
-
-		Ok (schema)
+		Ok (())
 	}
 
 	pub fn visit <V> (&self, index_bindings: &IndexBindings, visitor: &mut V)
@@ -308,41 +234,5 @@ where T: ToTokens
 		{
 			pattern_item . to_tokens (tokens);
 		}
-	}
-}
-
-#[derive (Clone, Debug)]
-pub struct NoParameterInRepetition <T>
-{
-	repetition: RepetitionPattern <T>
-}
-
-impl <T> NoParameterInRepetition <T>
-{
-	pub fn new (repetition: RepetitionPattern <T>) -> Self
-	{
-		Self {repetition}
-	}
-}
-
-impl <T> Display for NoParameterInRepetition <T>
-{
-	fn fmt (&self, f: &mut Formatter <'_>) -> Result <(), std::fmt::Error>
-	{
-		f . write_str ("No parameter in repetition")
-	}
-}
-
-impl <T> Error for NoParameterInRepetition <T>
-where T: Debug
-{
-}
-
-impl <T> Into <syn::Error> for NoParameterInRepetition <T>
-where T: ToTokens
-{
-	fn into (self) -> syn::Error
-	{
-		syn::Error::new_spanned (&self . repetition, &self)
 	}
 }
