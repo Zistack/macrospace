@@ -19,5 +19,6 @@ pub use macrospace_macros::{
 pub mod generics;
 pub mod path_utils;
 pub mod substitute;
+pub mod stream_utils;
 pub mod struct_utils;
 pub mod pattern;
