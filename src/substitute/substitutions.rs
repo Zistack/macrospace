@@ -28,6 +28,7 @@ use syn::fold
 };
 
 use crate::generics::get_num_required_arguments;
+use crate::path_utils::as_prefix;
 
 use super::parameter::Parameter;
 use super::argument::Argument;
@@ -364,7 +365,15 @@ macro_rules! fold_qpath
 								. cloned ()
 								. map (|segment| self . fold_path_segment (segment));
 
-							return parse_quote! (<#ty>#(::#tail_segments)*);
+							if let $QPath::Path (mut ty_path) = ty
+							{
+								ty_path . path = as_prefix (ty_path . path);
+								return parse_quote! (#ty_path #(::#tail_segments)*);
+							}
+							else
+							{
+								return parse_quote! (<#ty>#(::#tail_segments)*);
+							}
 						}
 					}
 				}
