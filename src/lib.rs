@@ -21,4 +21,5 @@ pub mod path_utils;
 pub mod substitute;
 pub mod stream_utils;
 pub mod struct_utils;
+pub mod enum_utils;
 pub mod pattern;

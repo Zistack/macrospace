@@ -22,7 +22,7 @@ where T: ToTokens
 	}
 }
 
-pub fn get_member_types (fields: &Fields) -> Vec <(Member, Type)>
+pub fn get_members_and_types (fields: &Fields) -> Vec <(Member, Type)>
 {
 	match fields
 	{
@@ -46,4 +46,37 @@ pub fn get_member_types (fields: &Fields) -> Vec <(Member, Type)>
 			. collect (),
 		Fields::Unit => Vec::new ()
 	}
+}
+
+pub fn get_members_and_types_split (fields: &Fields) -> (Vec <Member>, Vec <Type>)
+{
+	let mut members = Vec::new ();
+	let mut types = Vec::new ();
+
+	match fields
+	{
+		Fields::Named (named) => for field in &named . named
+		{
+			members . push (Member::from (field . ident . clone () . unwrap ()));
+			types . push (field . ty . clone ());
+		},
+		Fields::Unnamed (unnamed) => for (i, field) in unnamed . unnamed . iter () . enumerate ()
+		{
+			members . push (Member::from (i));
+			types . push (field . ty . clone ());
+		}
+		_ => {}
+	}
+
+	(members, types)
+}
+
+pub fn get_members (fields: &Fields) -> Vec <Member>
+{
+	fields . members () . collect ()
+}
+
+pub fn get_member_types (fields: &Fields) -> Vec <Type>
+{
+	fields . iter () . map (|field| field . ty . clone ()) . collect ()
 }
