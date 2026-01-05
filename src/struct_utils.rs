@@ -22,6 +22,16 @@ where T: ToTokens
 	}
 }
 
+pub fn get_members (fields: &Fields) -> Vec <Member>
+{
+	fields . members () . collect ()
+}
+
+pub fn get_member_types (fields: &Fields) -> Vec <Type>
+{
+	fields . iter () . map (|field| field . ty . clone ()) . collect ()
+}
+
 pub fn get_members_and_types (fields: &Fields) -> Vec <(Member, Type)>
 {
 	match fields
@@ -48,7 +58,8 @@ pub fn get_members_and_types (fields: &Fields) -> Vec <(Member, Type)>
 	}
 }
 
-pub fn get_members_and_types_split (fields: &Fields) -> (Vec <Member>, Vec <Type>)
+pub fn get_members_and_types_split (fields: &Fields)
+-> (Vec <Member>, Vec <Type>)
 {
 	let mut members = Vec::new ();
 	let mut types = Vec::new ();
@@ -69,14 +80,4 @@ pub fn get_members_and_types_split (fields: &Fields) -> (Vec <Member>, Vec <Type
 	}
 
 	(members, types)
-}
-
-pub fn get_members (fields: &Fields) -> Vec <Member>
-{
-	fields . members () . collect ()
-}
-
-pub fn get_member_types (fields: &Fields) -> Vec <Type>
-{
-	fields . iter () . map (|field| field . ty . clone ()) . collect ()
 }
